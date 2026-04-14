@@ -1,9 +1,17 @@
 import pandas as pd
 import io
+import re
 
+# NEW: Deep Sanitation function for case and space normalization
 def sanitize(text):
     if pd.isna(text): return ""
-    return str(text).strip().upper()
+    s = str(text).strip().upper()
+    if s == 'NAN': return ""
+    # Remove spaces around specific separators like /, -, &
+    s = re.sub(r'\s*([/&+-])\s*', r'\1', s)
+    # Condense any remaining multiple spaces into a single space
+    s = re.sub(r'\s+', ' ', s)
+    return s
 
 def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, working_days):
     if course_teacher_path.endswith('.xlsx'): df_ct = pd.read_excel(course_teacher_path)
@@ -22,19 +30,30 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
 
     df_ct = df_ct.rename(columns={v: k for k, v in column_map.items()})
     
-    for col in ['Course', 'Class']:
+    # CRITICAL FIX 1: Forward-fill empty Class cells (handles human-readable merged rows)
+    if 'Class' in df_ct.columns:
+        df_ct['Class'] = df_ct['Class'].replace(r'^\s*$', pd.NA, regex=True).ffill()
+        df_ct['Class'] = df_ct['Class'].apply(sanitize)
+        
+    for col in ['Course']:
         if col in df_ct.columns: df_ct[col] = df_ct[col].apply(sanitize)
     
     df_ct['Type'] = df_ct['Type'].apply(sanitize).replace('', 'L') if 'Type' in df_ct.columns else 'L'
 
-    classes = list(df_ct['Class'].unique())
+    classes = list(df_ct['Class'].unique()) if 'Class' in df_ct.columns else []
+    classes = [c for c in classes if c] # Remove any purely empty classes
+    
     CHMap = {} 
     CTMap = {} 
     teachers_set = set() 
     
     for _, row in df_ct.iterrows():
         if 'Class' not in df_ct.columns or 'Course' not in df_ct.columns: continue
-        key = (row['Class'], row['Course'])
+        class_id = row['Class']
+        course = row['Course']
+        if not class_id or not course: continue
+        
+        key = (class_id, course)
         if key not in CHMap:
             CHMap[key] = int(row.get('Hours', 4)) if pd.notna(row.get('Hours')) else 4
             CTMap[key] = {'type': row['Type'], 'teachers': []}
@@ -54,7 +73,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     max_slots = working_days * periods_per_day
     warnings = []
     
-    # Default period labels (P1, P2...) in case extraction fails
     period_labels = [f"P{i+1}" for i in range(periods_per_day)]
 
     def teacher_has_adjacent_class(t, slot):
@@ -70,11 +88,9 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
         if partial_tt_path.endswith('.xlsx'): df_partial = pd.read_excel(partial_tt_path, header=None)
         else: df_partial = pd.read_csv(partial_tt_path, header=None)
         
-        # NEW: Extract custom period headers from the second row (Index 1)
         if len(df_partial) > 1:
             row_2 = [sanitize(str(x)) if pd.notna(x) else "" for x in df_partial.iloc[1].values]
-            # Assume Column A is empty/labels, and periods start from Column B (index 1)
-            extracted_labels = [x for x in row_2[1:] if x and x != "NAN"]
+            extracted_labels = [x for x in row_2[1:] if x]
             if len(extracted_labels) > 0:
                 for i in range(min(len(extracted_labels), periods_per_day)):
                     period_labels[i] = extracted_labels[i]
@@ -91,9 +107,10 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                 for i in range(start_col, len(row_vals)):
                     if slot >= max_slots: break
                     val = row_vals[i]
-                    if val and val != "NAN":
+                    if val:
                         TT[class_id][slot] = val
                         key = (class_id, val)
+                        # CRITICAL FIX 2: Since everything is perfectly sanitized now, this deduction will trigger successfully!
                         if key in CHMap:
                             CHMap[key] -= 1  
                             for t in CTMap[key]['teachers']: TS[t][slot] = class_id 
@@ -102,7 +119,7 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
 
     # --- MAXIMALLY DISTANT SLOT-FILLING WITH TWO-PASS SOFT CONSTRAINTS ---
     for (class_id, course), remaining_hrs in CHMap.items():
-        if remaining_hrs <= 0: continue 
+        if remaining_hrs <= 0: continue # Skip if partial timetable fully satisfied requirements
             
         course_info = CTMap[(class_id, course)]
         is_simultaneous = "O" in course_info['type'] or "OTHER" in course_info['type']
@@ -158,7 +175,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                     t_str = best_teacher if best_teacher != "ALL" else ", ".join(assigned_teachers)
                     warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{day_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
 
-    # Pass the extracted period_labels to the front end
     return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings, 'period_labels': period_labels}
 
 def generate_class_excel(TT, classes, periods_per_day, working_days, period_labels=None):
@@ -179,10 +195,7 @@ def generate_teacher_excel(TT, TS, classes, teachers, periods_per_day, working_d
     if not period_labels: period_labels = [f"P{i+1}" for i in range(periods_per_day)]
     output = io.BytesIO()
     days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][:working_days]
-    
-    # NEW: Combine the Day and the Custom Period Label (e.g., "Mon-1", "Mon-BREAK")
     columns = [f"{d}-{period_labels[p]}" for d in days for p in range(periods_per_day)]
-    
     global_slots = [(d_idx * periods_per_day) + p_idx for d_idx in range(working_days) for p_idx in range(periods_per_day)]
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         master_data = []
