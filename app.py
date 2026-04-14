@@ -43,7 +43,13 @@ def generate():
         app_state['TS'] = TS
         app_state['metadata'] = metadata
 
-        return jsonify({'message': 'Timetable generated successfully!'})
+        # Extract warnings from metadata to send to frontend
+        warnings = metadata.get('warnings', [])
+
+        return jsonify({
+            'message': 'Timetable generated successfully!',
+            'warnings': warnings
+        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
