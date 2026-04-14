@@ -6,13 +6,14 @@ def sanitize(text):
     if pd.isna(text): return ""
     s = str(text).strip().upper()
     if s == 'NAN': return ""
-    # FIX: Remove floating .0 from pure numbers
+    # Remove floating .0 from pure numbers (e.g., "3.0" becomes "3")
     if s.endswith('.0'): s = s[:-2]
+    # Remove spaces around specific separators like /, -, &
     s = re.sub(r'\s*([/&+-])\s*', r'\1', s)
+    # Condense any remaining multiple spaces into a single space
     s = re.sub(r'\s+', ' ', s)
     return s
 
-# NEW: Added unsuitable_slots to parameters
 def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, working_days, unsuitable_slots=None):
     if course_teacher_path.endswith('.xlsx'): df_ct = pd.read_excel(course_teacher_path)
     else: df_ct = pd.read_csv(course_teacher_path)
@@ -74,7 +75,7 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     
     period_labels = [f"P{i+1}" for i in range(periods_per_day)]
 
-    # NEW: Lock unsuitable slots for specified teachers right away
+    # Lock unsuitable slots for specified teachers right away
     if unsuitable_slots:
         for us in unsuitable_slots:
             t_name = sanitize(us.get('teacher'))
@@ -86,7 +87,12 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                 TS[t_name][global_slot] = 'BUSY'
 
     def teacher_has_adjacent_class(t, slot):
-        # ... (Keep the rest of scheduler.py completely unchanged from this line down) ...
+        is_adj = False
+        if slot > 0 and (slot % periods_per_day != 0) and TS[t].get(slot - 1) is not None and TS[t].get(slot - 1) != 'BUSY':
+            is_adj = True
+        if slot < max_slots - 1 and ((slot + 1) % periods_per_day != 0) and TS[t].get(slot + 1) is not None and TS[t].get(slot + 1) != 'BUSY':
+            is_adj = True
+        return is_adj
 
     # --- PRE-PROCESS PARTIALLY FILLED TIMETABLE ---
     try:
@@ -115,7 +121,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                     if val:
                         TT[class_id][slot] = val
                         key = (class_id, val)
-                        # CRITICAL FIX 2: Since everything is perfectly sanitized now, this deduction will trigger successfully!
                         if key in CHMap:
                             CHMap[key] -= 1  
                             for t in CTMap[key]['teachers']: TS[t][slot] = class_id 
@@ -124,7 +129,7 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
 
     # --- MAXIMALLY DISTANT SLOT-FILLING WITH TWO-PASS SOFT CONSTRAINTS ---
     for (class_id, course), remaining_hrs in CHMap.items():
-        if remaining_hrs <= 0: continue # Skip if partial timetable fully satisfied requirements
+        if remaining_hrs <= 0: continue 
             
         course_info = CTMap[(class_id, course)]
         is_simultaneous = "O" in course_info['type'] or "OTHER" in course_info['type']
@@ -168,53 +173,4 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
             
             if best_slot is not None:
                 TT[class_id][best_slot] = course
-                if best_teacher == "ALL":
-                    for t in assigned_teachers: TS[t][best_slot] = class_id
-                else:
-                    TS[best_teacher][best_slot] = class_id
-                
-                if not is_perfect_match:
-                    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-                    day_name = day_names[best_slot // periods_per_day]
-                    p_label = period_labels[best_slot % periods_per_day]
-                    t_str = best_teacher if best_teacher != "ALL" else ", ".join(assigned_teachers)
-                    warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{day_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
-
-    return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings, 'period_labels': period_labels}
-
-def generate_class_excel(TT, classes, periods_per_day, working_days, period_labels=None):
-    if not period_labels: period_labels = [f"P{i+1}" for i in range(periods_per_day)]
-    output = io.BytesIO()
-    days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][:working_days]
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        for class_id in classes:
-            grid = {label: [] for label in period_labels}
-            for d_idx in range(working_days):
-                for p_idx in range(periods_per_day):
-                    slot = (d_idx * periods_per_day) + p_idx
-                    grid[period_labels[p_idx]].append(TT.get(class_id, {}).get(slot, "-"))
-            pd.DataFrame(grid, index=days).to_excel(writer, sheet_name=str(class_id)[:31])
-    output.seek(0); return output
-
-def generate_teacher_excel(TT, TS, classes, teachers, periods_per_day, working_days, period_labels=None):
-    if not period_labels: period_labels = [f"P{i+1}" for i in range(periods_per_day)]
-    output = io.BytesIO()
-    days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][:working_days]
-    columns = [f"{d}-{period_labels[p]}" for d in days for p in range(periods_per_day)]
-    global_slots = [(d_idx * periods_per_day) + p_idx for d_idx in range(working_days) for p_idx in range(periods_per_day)]
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        master_data = []
-        for c in classes: master_data.append([TT.get(c, {}).get(s, "-") for s in global_slots])
-        pd.DataFrame(master_data, index=classes, columns=columns).to_excel(writer, sheet_name="Master Class Matrix")
-
-        faculty_data = []
-        for t in teachers:
-            row, count = [], 0
-            for s in global_slots:
-                val = TS.get(t, {}).get(s, "-")
-                if val not in ["-", "BUSY"]: count += 1
-                row.append(val)
-            row.append(count)
-            faculty_data.append(row)
-        pd.DataFrame(faculty_data, index=teachers, columns=columns + ["Total Periods"]).to_excel(writer, sheet_name="Faculty Workload")
-    output.seek(0); return output
+                if best_teacher ==
