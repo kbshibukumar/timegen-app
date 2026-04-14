@@ -1,135 +1,124 @@
 import pandas as pd
 import io
+import math
 
 def sanitize(text):
-    if pd.isna(text):
-        return ""
+    if pd.isna(text): return ""
     return str(text).strip().upper()
 
 def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, working_days):
     # --- 1. DATA INGESTION ---
-    # Load Course-Teacher mapping
     if course_teacher_path.endswith('.xlsx'):
         df_ct = pd.read_excel(course_teacher_path)
     else:
         df_ct = pd.read_csv(course_teacher_path)
     
-    # Strip invisible spaces from raw headers
     df_ct.columns = df_ct.columns.str.strip()
     
-    # DYNAMIC COLUMN MAPPING: Find your descriptive headers by keywords
     column_map = {}
     for col in df_ct.columns:
         col_upper = col.upper()
-        if "TEACHER" in col_upper: 
-            column_map['Teacher'] = col
-        elif "COURSE" in col_upper and "TYPE" not in col_upper: 
-            column_map['Course'] = col
-        elif "CLASS" in col_upper: 
-            column_map['Class'] = col
-        elif "TYPE" in col_upper: 
-            column_map['Type'] = col
-        elif "PERIOD" in col_upper or "HOUR" in col_upper or "MAXIMUM" in col_upper: 
-            column_map['Hours'] = col
+        if "TEACHER" in col_upper: column_map['Teacher'] = col
+        elif "COURSE" in col_upper and "TYPE" not in col_upper: column_map['Course'] = col
+        elif "CLASS" in col_upper: column_map['Class'] = col
+        elif "TYPE" in col_upper: column_map['Type'] = col
+        elif any(k in col_upper for k in ["PERIOD", "HOUR", "MAXIMUM"]): column_map['Hours'] = col
 
-    # Rename your long headers to standard names used by the algorithm
     df_ct = df_ct.rename(columns={v: k for k, v in column_map.items()})
     
-    # Sanitize standard columns
     for col in ['Course', 'Class']:
-        if col in df_ct.columns:
-            df_ct[col] = df_ct[col].apply(sanitize)
+        if col in df_ct.columns: df_ct[col] = df_ct[col].apply(sanitize)
     
-    # Handle 'Type' column specifically
-    if 'Type' not in df_ct.columns:
-        df_ct['Type'] = 'L'
-    else:
-        df_ct['Type'] = df_ct['Type'].apply(sanitize).replace('', 'L')
+    df_ct['Type'] = df_ct['Type'].apply(sanitize).replace('', 'L') if 'Type' in df_ct.columns else 'L'
 
-    classes = list(df_ct['Class'].unique()) if 'Class' in df_ct.columns else []
-    
-    # Build Requirement Maps and parse teachers (Handling Scenario 2: Comma separation)
+    classes = list(df_ct['Class'].unique())
     CHMap = {} 
     CTMap = {} 
     teachers_set = set() 
     
     for _, row in df_ct.iterrows():
-        # Ensure we have the minimum required data
-        if 'Class' not in df_ct.columns or 'Course' not in df_ct.columns:
-            continue
-            
         key = (row['Class'], row['Course'])
         if key not in CHMap:
-            # Default to 4 hours if the 'Hours' column is missing or empty
             CHMap[key] = int(row.get('Hours', 4)) if pd.notna(row.get('Hours')) else 4
             CTMap[key] = {'type': row['Type'], 'teachers': []}
         
-        # Split teachers separated by commas (your Scenario 2)
-        if 'Teacher' in df_ct.columns:
-            raw_teachers = str(row['Teacher']).split(',')
-            for t in raw_teachers:
-                clean_teacher = sanitize(t)
-                if clean_teacher:
-                    teachers_set.add(clean_teacher)
-                    if clean_teacher not in CTMap[key]['teachers']:
-                        CTMap[key]['teachers'].append(clean_teacher)
+        raw_teachers = str(row['Teacher']).split(',')
+        for t in raw_teachers:
+            clean_teacher = sanitize(t)
+            if clean_teacher:
+                teachers_set.add(clean_teacher)
+                if clean_teacher not in CTMap[key]['teachers']:
+                    CTMap[key]['teachers'].append(clean_teacher)
 
-    teachers = list(teachers_set)
-    
-    # Initialize Matrices
+    teachers = sorted(list(teachers_set))
     TT = {c: {} for c in classes} 
     TS = {t: {} for t in teachers} 
     
-    # Process Partially Filled TT
+    # Process Partial (Locked) Slots
     try:
-        if partial_tt_path.endswith('.xlsx'):
-            df_partial = pd.read_excel(partial_tt_path)
-        else:
-            df_partial = pd.read_csv(partial_tt_path)
-        # Note: In a production version, you would map df_partial to TT and TS here
-    except Exception as e:
-        print(f"Warning: Could not process partial timetable: {e}")
+        df_partial = pd.read_excel(partial_tt_path) if partial_tt_path.endswith('.xlsx') else pd.read_csv(partial_tt_path)
+        # Note: Pre-fill logic for lab preferences could be added here
+    except Exception: pass
 
-    # --- 2. SLOT-FILLING ALGORITHM ---
+    # --- 2. MAXIMALLY DISTANT SLOT-FILLING ALGORITHM ---
     max_slots = working_days * periods_per_day 
 
-    for (class_id, course), hours in CHMap.items():
+    for (class_id, course), total_hrs in CHMap.items():
         course_info = CTMap[(class_id, course)]
-        course_type = course_info['type']
+        is_simultaneous = "O" in course_info['type'] or "OTHER" in course_info['type']
         assigned_teachers = course_info['teachers']
         
-        remaining_hrs = hours
-        
-        for slot in range(max_slots):
-            if remaining_hrs <= 0:
-                break
-                
-            # Constraint 1: Class must be free
-            if TT[class_id].get(slot) is not None:
-                continue
-                
-            # Constraint 2: No consecutive classes of same subject (on same day)
-            if slot > 0 and (slot % periods_per_day != 0) and TT[class_id].get(slot - 1) == course:
-                continue
-                
-            if course_type == 'O' or "OTHER" in course_type:
-                # Type 'O': ALL teachers must be free simultaneously
-                teachers_free = all(TS.get(t, {}).get(slot) is None for t in assigned_teachers)
-                if teachers_free:
-                    TT[class_id][slot] = course
-                    for t in assigned_teachers:
-                        TS[t][slot] = class_id
-                    remaining_hrs -= 1
-            else:
-                # Type 'L': Only one teacher needs to be free
-                for t in assigned_teachers:
-                    if TS.get(t, {}).get(slot) is None:
-                        TT[class_id][slot] = course
-                        TS[t][slot] = class_id
-                        remaining_hrs -= 1
-                        break 
+        # Calculate Interval for Maximally Distant distribution 
+        if total_hrs > 1:
+            interval = max(1, max_slots // total_hrs)
+        else:
+            interval = max_slots // 2
 
-    # Return values for the Flask app to unpack
+        for i in range(total_hrs):
+            # Target initial distant positions [cite: 268]
+            target_slot = (i * interval) % max_slots
+            
+            # Move Left/Right logic to find the closest free slot 
+            found = False
+            for offset in range(max_slots):
+                # Check target, then +1, -1, +2, -2...
+                for direction in [1, -1]:
+                    check_slot = (target_slot + offset * direction) % max_slots
+                    
+                    # Constraint check: Class Free
+                    if TT[class_id].get(check_slot) is not None: continue
+                    
+                    # Constraint check: No consecutive periods of same course [cite: 125, 153]
+                    is_consecutive = False
+                    if check_slot > 0 and (check_slot % periods_per_day != 0):
+                        if TT[class_id].get(check_slot - 1) == course: is_consecutive = True
+                    if check_slot < max_slots - 1 and ((check_slot + 1) % periods_per_day != 0):
+                        if TT[class_id].get(check_slot + 1) == course: is_consecutive = True
+                    if is_consecutive: continue
+
+                    # Constraint check: Teacher Availability [cite: 153, 172]
+                    selected_teacher = None
+                    if is_simultaneous:
+                        if all(TS[t].get(check_slot) is None for t in assigned_teachers):
+                            selected_teacher = "ALL"
+                    else:
+                        # Find the teacher with fewest hours so far to balance workload
+                        assigned_teachers.sort(key=lambda t: sum(1 for s in TS[t].values() if s != 'BUSY'))
+                        for t in assigned_teachers:
+                            if TS[t].get(check_slot) is None:
+                                selected_teacher = t
+                                break
+                    
+                    if selected_teacher:
+                        TT[class_id][check_slot] = course
+                        if selected_teacher == "ALL":
+                            for t in assigned_teachers: TS[t][check_slot] = class_id
+                        else:
+                            TS[selected_teacher][check_slot] = class_id
+                        found = True
+                        break
+                if found: break
+
     return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days}
 
 def generate_class_excel(TT, classes, periods_per_day, working_days):
@@ -141,14 +130,12 @@ def generate_class_excel(TT, classes, periods_per_day, working_days):
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         for class_id in classes:
             grid = {p: [] for p in periods}
-            for day_idx, day in enumerate(days):
-                for p_idx, p in enumerate(periods):
-                    global_slot = (day_idx * periods_per_day) + p_idx 
-                    course = TT.get(class_id, {}).get(global_slot, "-")
-                    grid[p].append(course)
+            for d_idx in range(working_days):
+                for p_idx in range(periods_per_day):
+                    slot = (d_idx * periods_per_day) + p_idx
+                    grid[f"Period {p_idx+1}"].append(TT.get(class_id, {}).get(slot, "-"))
             
             df = pd.DataFrame(grid, index=days)
-            df.index.name = f"Class: {class_id}"
             df.to_excel(writer, sheet_name=str(class_id)[:31])
     output.seek(0)
     return output
@@ -158,40 +145,29 @@ def generate_teacher_excel(TT, TS, classes, teachers, periods_per_day, working_d
     all_days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
     days = all_days[:working_days]
     
-    columns = []
-    global_slots_to_check = []
-    for day_idx, day in enumerate(days):
-        for p_idx in range(periods_per_day):
-            columns.append(f"{day}-P{p_idx+1}")
-            global_slots_to_check.append((day_idx * periods_per_day) + p_idx)
+    columns = [f"{d}-P{p+1}" for d in days for p in range(periods_per_day)]
+    global_slots = [(d_idx * periods_per_day) + p_idx for d_idx in range(working_days) for p_idx in range(periods_per_day)]
 
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         # Part 1: Master Class Matrix
         master_data = []
-        for class_id in classes:
-            row_data = [TT.get(class_id, {}).get(slot, "-") for slot in global_slots_to_check]
-            master_data.append(row_data)
-        df_master = pd.DataFrame(master_data, index=classes, columns=columns)
-        df_master.index.name = "Classes"
-        df_master.to_excel(writer, sheet_name="Master Class Matrix")
+        for c in classes:
+            master_data.append([TT.get(c, {}).get(s, "-") for s in global_slots])
+        pd.DataFrame(master_data, index=classes, columns=columns).to_excel(writer, sheet_name="Master Class Matrix")
 
-        # Part 2: Faculty Workload Matrix
+        # Part 2: Faculty Workload Matrix (Ensures every teacher is listed)
         faculty_data = []
-        for teacher in teachers:
-            row_data = []
-            total_periods = 0
-            for slot in global_slots_to_check:
-                assigned_class = TS.get(teacher, {}).get(slot, "-")
-                if assigned_class not in ["-", "BUSY"]:
-                    total_periods += 1
-                row_data.append(assigned_class)
-            row_data.append(total_periods)
-            faculty_data.append(row_data)
+        for t in teachers:
+            row = []
+            count = 0
+            for s in global_slots:
+                val = TS.get(t, {}).get(s, "-")
+                if val not in ["-", "BUSY"]: count += 1
+                row.append(val)
+            row.append(count)
+            faculty_data.append(row)
             
-        faculty_columns = columns + ["Total Periods / Week"]
-        df_faculty = pd.DataFrame(faculty_data, index=teachers, columns=faculty_columns)
-        df_faculty.index.name = "Faculty"
-        df_faculty.to_excel(writer, sheet_name="Faculty Workload")
+        pd.DataFrame(faculty_data, index=teachers, columns=columns + ["Total Periods"]).to_excel(writer, sheet_name="Faculty Workload")
 
     output.seek(0)
     return output
