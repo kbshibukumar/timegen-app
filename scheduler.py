@@ -2,18 +2,18 @@ import pandas as pd
 import io
 import re
 
-# NEW: Deep Sanitation function for case and space normalization
 def sanitize(text):
     if pd.isna(text): return ""
     s = str(text).strip().upper()
     if s == 'NAN': return ""
-    # Remove spaces around specific separators like /, -, &
+    # FIX: Remove floating .0 from pure numbers
+    if s.endswith('.0'): s = s[:-2]
     s = re.sub(r'\s*([/&+-])\s*', r'\1', s)
-    # Condense any remaining multiple spaces into a single space
     s = re.sub(r'\s+', ' ', s)
     return s
 
-def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, working_days):
+# NEW: Added unsuitable_slots to parameters
+def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, working_days, unsuitable_slots=None):
     if course_teacher_path.endswith('.xlsx'): df_ct = pd.read_excel(course_teacher_path)
     else: df_ct = pd.read_csv(course_teacher_path)
     
@@ -30,7 +30,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
 
     df_ct = df_ct.rename(columns={v: k for k, v in column_map.items()})
     
-    # CRITICAL FIX 1: Forward-fill empty Class cells (handles human-readable merged rows)
     if 'Class' in df_ct.columns:
         df_ct['Class'] = df_ct['Class'].replace(r'^\s*$', pd.NA, regex=True).ffill()
         df_ct['Class'] = df_ct['Class'].apply(sanitize)
@@ -41,7 +40,7 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     df_ct['Type'] = df_ct['Type'].apply(sanitize).replace('', 'L') if 'Type' in df_ct.columns else 'L'
 
     classes = list(df_ct['Class'].unique()) if 'Class' in df_ct.columns else []
-    classes = [c for c in classes if c] # Remove any purely empty classes
+    classes = [c for c in classes if c] 
     
     CHMap = {} 
     CTMap = {} 
@@ -75,13 +74,19 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     
     period_labels = [f"P{i+1}" for i in range(periods_per_day)]
 
+    # NEW: Lock unsuitable slots for specified teachers right away
+    if unsuitable_slots:
+        for us in unsuitable_slots:
+            t_name = sanitize(us.get('teacher'))
+            d_idx = int(us.get('day'))
+            p_idx = int(us.get('period'))
+            global_slot = (d_idx * periods_per_day) + p_idx
+            
+            if t_name in TS and global_slot < max_slots:
+                TS[t_name][global_slot] = 'BUSY'
+
     def teacher_has_adjacent_class(t, slot):
-        is_adj = False
-        if slot > 0 and (slot % periods_per_day != 0) and TS[t].get(slot - 1) is not None and TS[t].get(slot - 1) != 'BUSY':
-            is_adj = True
-        if slot < max_slots - 1 and ((slot + 1) % periods_per_day != 0) and TS[t].get(slot + 1) is not None and TS[t].get(slot + 1) != 'BUSY':
-            is_adj = True
-        return is_adj
+        # ... (Keep the rest of scheduler.py completely unchanged from this line down) ...
 
     # --- PRE-PROCESS PARTIALLY FILLED TIMETABLE ---
     try:
