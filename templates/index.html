@@ -22,8 +22,13 @@
 
     <form id="uploadForm">
         <div class="form-group">
+            <label for="working_days">Working Days per Week:</label>
+            <input type="number" id="working_days" name="working_days" value="5" min="1" max="7" required>
+        </div>
+
+        <div class="form-group">
             <label for="periods_per_day">Periods per Day:</label>
-            <input type="number" id="periods_per_day" name="periods_per_day" value="7" required>
+            <input type="number" id="periods_per_day" name="periods_per_day" value="7" min="1" required>
         </div>
 
         <div class="form-group">
@@ -68,7 +73,7 @@
                 if (response.ok) {
                     resultDiv.innerText = data.message;
                     resultDiv.style.color = "green";
-                    downloadSection.style.display = 'block'; // Reveal the buttons
+                    downloadSection.style.display = 'block';
                 } else {
                     resultDiv.innerText = "Error: " + data.error;
                     resultDiv.style.color = "red";

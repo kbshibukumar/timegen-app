@@ -7,7 +7,7 @@ app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# Global variables to hold state for downloads (suitable for single-user admin)
+# Global variables to hold state for downloads
 app_state = {
     'TT': {},
     'TS': {},
@@ -25,7 +25,9 @@ def generate():
 
     partial_file = request.files['partial_tt']
     course_file = request.files['course_teacher']
+    
     periods_per_day = int(request.form.get('periods_per_day', 7))
+    working_days = int(request.form.get('working_days', 5))
 
     partial_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(partial_file.filename))
     course_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(course_file.filename))
@@ -34,7 +36,7 @@ def generate():
     course_file.save(course_path)
 
     try:
-        TT, TS, metadata = generate_timetable(partial_path, course_path, periods_per_day)
+        TT, TS, metadata = generate_timetable(partial_path, course_path, periods_per_day, working_days)
         
         # Save to global state for the download routes
         app_state['TT'] = TT
@@ -49,14 +51,14 @@ def generate():
 def download_class_tt():
     if not app_state['TT']:
         return "No timetable generated yet", 400
-    excel_file = generate_class_excel(app_state['TT'], app_state['metadata']['classes'], app_state['metadata']['periods'])
+    excel_file = generate_class_excel(app_state['TT'], app_state['metadata']['classes'], app_state['metadata']['periods'], app_state['metadata']['working_days'])
     return send_file(excel_file, download_name="Class_TimeTable.xlsx", as_attachment=True)
 
 @app.route('/download/teacher_timetable')
 def download_teacher_tt():
     if not app_state['TT']:
         return "No timetable generated yet", 400
-    excel_file = generate_teacher_excel(app_state['TT'], app_state['TS'], app_state['metadata']['classes'], app_state['metadata']['teachers'], app_state['metadata']['periods'])
+    excel_file = generate_teacher_excel(app_state['TT'], app_state['TS'], app_state['metadata']['classes'], app_state['metadata']['teachers'], app_state['metadata']['periods'], app_state['metadata']['working_days'])
     return send_file(excel_file, download_name="Teacher_TimeTable.xlsx", as_attachment=True)
 
 if __name__ == '__main__':
