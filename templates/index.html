@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeGen - Automated Scheduling</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="file"], input[type="number"] { width: 100%; padding: 8px; margin-bottom: 10px; }
+        button { background-color: #0056b3; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #004494; }
+        .download-btn { background-color: #28a745; display: inline-block; text-decoration: none; margin-right: 10px; margin-top: 20px; padding: 10px 15px; color: white;}
+        #result-message { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>TimeGen: Timetable Generator</h1>
+    <p>Upload your configurations to generate the academic timetable.</p>
+
+    <form id="uploadForm">
+        <div class="form-group">
+            <label for="periods_per_day">Periods per Day:</label>
+            <input type="number" id="periods_per_day" name="periods_per_day" value="7" required>
+        </div>
+
+        <div class="form-group">
+            <label for="partial_tt">Partially Filled Timetable (Excel/CSV):</label>
+            <input type="file" id="partial_tt" name="partial_tt" accept=".xlsx, .xls, .csv" required>
+        </div>
+
+        <div class="form-group">
+            <label for="course_teacher">Course-Teacher Mapping (Excel/CSV):</label>
+            <input type="file" id="course_teacher" name="course_teacher" accept=".xlsx, .xls, .csv" required>
+        </div>
+
+        <button type="submit">Generate Timetable</button>
+    </form>
+
+    <div id="result-message"></div>
+
+    <div id="download-section" style="display: none;">
+        <a href="/download/class_timetable" class="download-btn">Download Class Matrices</a>
+        <a href="/download/teacher_timetable" class="download-btn">Download Teacher Workloads</a>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').onsubmit = async function(e) {
+            e.preventDefault();
+            const formData = new FormData(this);
+            const resultDiv = document.getElementById('result-message');
+            const downloadSection = document.getElementById('download-section');
+            
+            resultDiv.innerText = "Generating... Please wait.";
+            resultDiv.style.color = "black";
+            downloadSection.style.display = 'none';
+
+            try {
+                const response = await fetch('/generate', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    resultDiv.innerText = data.message;
+                    resultDiv.style.color = "green";
+                    downloadSection.style.display = 'block'; // Reveal the buttons
+                } else {
+                    resultDiv.innerText = "Error: " + data.error;
+                    resultDiv.style.color = "red";
+                }
+            } catch (error) {
+                resultDiv.innerText = "A network error occurred.";
+                resultDiv.style.color = "red";
+            }
+        };
+    </script>
+</body>
+</html>
