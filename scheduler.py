@@ -52,9 +52,11 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     TT = {c: {} for c in classes} 
     TS = {t: {} for t in teachers} 
     max_slots = working_days * periods_per_day
-    warnings = [] # NEW: List to store soft constraint violations
+    warnings = []
+    
+    # Default period labels (P1, P2...) in case extraction fails
+    period_labels = [f"P{i+1}" for i in range(periods_per_day)]
 
-    # Helper function to check if a teacher has a class right before or right after a given slot
     def teacher_has_adjacent_class(t, slot):
         is_adj = False
         if slot > 0 and (slot % periods_per_day != 0) and TS[t].get(slot - 1) is not None and TS[t].get(slot - 1) != 'BUSY':
@@ -67,7 +69,16 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     try:
         if partial_tt_path.endswith('.xlsx'): df_partial = pd.read_excel(partial_tt_path, header=None)
         else: df_partial = pd.read_csv(partial_tt_path, header=None)
-            
+        
+        # NEW: Extract custom period headers from the second row (Index 1)
+        if len(df_partial) > 1:
+            row_2 = [sanitize(str(x)) if pd.notna(x) else "" for x in df_partial.iloc[1].values]
+            # Assume Column A is empty/labels, and periods start from Column B (index 1)
+            extracted_labels = [x for x in row_2[1:] if x and x != "NAN"]
+            if len(extracted_labels) > 0:
+                for i in range(min(len(extracted_labels), periods_per_day)):
+                    period_labels[i] = extracted_labels[i]
+
         for _, row in df_partial.iterrows():
             row_vals = [sanitize(str(x)) if pd.notna(x) else "" for x in row.values]
             class_id, start_col = None, 0
@@ -101,35 +112,26 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
 
         for i in range(remaining_hrs):
             target_slot = (i * interval) % max_slots
-            
-            best_slot = None
-            best_teacher = None
-            is_perfect_match = False
+            best_slot, best_teacher, is_perfect_match = None, None, False
             
             for offset in range(max_slots):
                 directions = [1, -1] if offset > 0 else [1]
                 for direction in directions:
                     check_slot = (target_slot + offset * direction) % max_slots
                     
-                    # Hard Constraint 1: Class Free
                     if TT[class_id].get(check_slot) is not None: continue
                     
-                    # Hard Constraint 2: No consecutive same-course for class
                     is_consecutive_course = False
                     if check_slot > 0 and (check_slot % periods_per_day != 0) and TT[class_id].get(check_slot - 1) == course: is_consecutive_course = True
                     if check_slot < max_slots - 1 and ((check_slot + 1) % periods_per_day != 0) and TT[class_id].get(check_slot + 1) == course: is_consecutive_course = True
                     if is_consecutive_course: continue
 
-                    # Hard Constraint 3: Teacher Availability + Soft Constraint Check
                     if is_simultaneous:
                         if all(TS[t].get(check_slot) is None for t in assigned_teachers):
-                            # Perfect match: All free AND no adjacent classes
                             if all(not teacher_has_adjacent_class(t, check_slot) for t in assigned_teachers):
                                 best_slot, best_teacher, is_perfect_match = check_slot, "ALL", True
                                 break
-                            # Relaxed match: All free, but someone has an adjacent class. Save it as fallback.
-                            elif best_slot is None:
-                                best_slot, best_teacher = check_slot, "ALL"
+                            elif best_slot is None: best_slot, best_teacher = check_slot, "ALL"
                     else:
                         assigned_teachers.sort(key=lambda t: sum(1 for s in TS[t].values() if s not in ['BUSY', '-']))
                         for t in assigned_teachers:
@@ -137,13 +139,11 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                                 if not teacher_has_adjacent_class(t, check_slot):
                                     best_slot, best_teacher, is_perfect_match = check_slot, t, True
                                     break
-                                elif best_slot is None:
-                                    best_slot, best_teacher = check_slot, t
+                                elif best_slot is None: best_slot, best_teacher = check_slot, t
                                     
                     if is_perfect_match: break
                 if is_perfect_match: break
             
-            # Assignment phase
             if best_slot is not None:
                 TT[class_id][best_slot] = course
                 if best_teacher == "ALL":
@@ -151,34 +151,38 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                 else:
                     TS[best_teacher][best_slot] = class_id
                 
-                # If we had to use a relaxed match, log a warning for the user
                 if not is_perfect_match:
                     day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
                     day_name = day_names[best_slot // periods_per_day]
-                    p_num = (best_slot % periods_per_day) + 1
+                    p_label = period_labels[best_slot % periods_per_day]
                     t_str = best_teacher if best_teacher != "ALL" else ", ".join(assigned_teachers)
-                    warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{day_name} (Period {p_num})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
+                    warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{day_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
 
-    return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings}
+    # Pass the extracted period_labels to the front end
+    return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings, 'period_labels': period_labels}
 
-def generate_class_excel(TT, classes, periods_per_day, working_days):
+def generate_class_excel(TT, classes, periods_per_day, working_days, period_labels=None):
+    if not period_labels: period_labels = [f"P{i+1}" for i in range(periods_per_day)]
     output = io.BytesIO()
     days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][:working_days]
-    periods = [f"Period {i+1}" for i in range(periods_per_day)]
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         for class_id in classes:
-            grid = {p: [] for p in periods}
+            grid = {label: [] for label in period_labels}
             for d_idx in range(working_days):
                 for p_idx in range(periods_per_day):
                     slot = (d_idx * periods_per_day) + p_idx
-                    grid[f"Period {p_idx+1}"].append(TT.get(class_id, {}).get(slot, "-"))
+                    grid[period_labels[p_idx]].append(TT.get(class_id, {}).get(slot, "-"))
             pd.DataFrame(grid, index=days).to_excel(writer, sheet_name=str(class_id)[:31])
     output.seek(0); return output
 
-def generate_teacher_excel(TT, TS, classes, teachers, periods_per_day, working_days):
+def generate_teacher_excel(TT, TS, classes, teachers, periods_per_day, working_days, period_labels=None):
+    if not period_labels: period_labels = [f"P{i+1}" for i in range(periods_per_day)]
     output = io.BytesIO()
     days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][:working_days]
-    columns = [f"{d}-P{p+1}" for d in days for p in range(periods_per_day)]
+    
+    # NEW: Combine the Day and the Custom Period Label (e.g., "Mon-1", "Mon-BREAK")
+    columns = [f"{d}-{period_labels[p]}" for d in days for p in range(periods_per_day)]
+    
     global_slots = [(d_idx * periods_per_day) + p_idx for d_idx in range(working_days) for p_idx in range(periods_per_day)]
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         master_data = []

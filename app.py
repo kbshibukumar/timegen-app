@@ -57,14 +57,30 @@ def generate():
 def download_class_tt():
     if not app_state['TT']:
         return "No timetable generated yet", 400
-    excel_file = generate_class_excel(app_state['TT'], app_state['metadata']['classes'], app_state['metadata']['periods'], app_state['metadata']['working_days'])
+    
+    excel_file = generate_class_excel(
+        app_state['TT'], 
+        app_state['metadata']['classes'], 
+        app_state['metadata']['periods'], 
+        app_state['metadata']['working_days'],
+        app_state['metadata'].get('period_labels') # NEW: Pass the labels
+    )
     return send_file(excel_file, download_name="Class_TimeTable.xlsx", as_attachment=True)
 
 @app.route('/download/teacher_timetable')
 def download_teacher_tt():
     if not app_state['TT']:
         return "No timetable generated yet", 400
-    excel_file = generate_teacher_excel(app_state['TT'], app_state['TS'], app_state['metadata']['classes'], app_state['metadata']['teachers'], app_state['metadata']['periods'], app_state['metadata']['working_days'])
+        
+    excel_file = generate_teacher_excel(
+        app_state['TT'], 
+        app_state['TS'], 
+        app_state['metadata']['classes'], 
+        app_state['metadata']['teachers'], 
+        app_state['metadata']['periods'], 
+        app_state['metadata']['working_days'],
+        app_state['metadata'].get('period_labels') # NEW: Pass the labels
+    )
     return send_file(excel_file, download_name="Teacher_TimeTable.xlsx", as_attachment=True)
 
 if __name__ == '__main__':
