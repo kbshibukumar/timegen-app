@@ -184,6 +184,9 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                     p_label = period_labels[best_slot % periods_per_day]
                     t_str = best_teacher if best_teacher != "ALL" else ", ".join(assigned_teachers)
                     warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{day_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
+            else:
+                # NEW: Catch the failure and alert the user!
+                warnings.append(f"🚨 <b>Failed to allocate period:</b> Could not find a valid slot for <b>{class_id} ({course})</b>. It was supposed to get {remaining_hrs} remaining periods, but constraints were too tight. Please adjust manually.")
 
     return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings, 'period_labels': period_labels}
 
