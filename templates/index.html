@@ -1,11 +1,64 @@
-<script>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeGen - Automated Scheduling</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="file"], input[type="number"] { width: 100%; padding: 8px; margin-bottom: 10px; }
+        button { background-color: #0056b3; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; }
+        button:hover { background-color: #004494; }
+        .download-btn { background-color: #28a745; display: inline-block; text-decoration: none; margin-right: 10px; margin-top: 20px; padding: 10px 15px; color: white;}
+        #result-message { margin-top: 20px; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h1>TimeGen: Timetable Generator</h1>
+    <p>Upload your configurations to generate the academic timetable.</p>
+
+    <form id="uploadForm">
+        <div class="form-group">
+            <label for="working_days">Working Days per Week:</label>
+            <input type="number" id="working_days" name="working_days" value="5" min="1" max="7" required>
+        </div>
+
+        <div class="form-group">
+            <label for="periods_per_day">Periods per Day:</label>
+            <input type="number" id="periods_per_day" name="periods_per_day" value="7" min="1" required>
+        </div>
+
+        <div class="form-group">
+            <label for="partial_tt">Partially Filled Timetable (Excel/CSV):</label>
+            <input type="file" id="partial_tt" name="partial_tt" accept=".xlsx, .xls, .csv" required>
+        </div>
+
+        <div class="form-group">
+            <label for="course_teacher">Course-Teacher Mapping (Excel/CSV):</label>
+            <input type="file" id="course_teacher" name="course_teacher" accept=".xlsx, .xls, .csv" required>
+        </div>
+
+        <button type="submit">Generate Timetable</button>
+    </form>
+
+    <div id="result-message"></div>
+
+    <div id="download-section" style="display: none;">
+        <a href="/download/class_timetable" class="download-btn">Download Class Matrices</a>
+        <a href="/download/teacher_timetable" class="download-btn">Download Teacher Workloads</a>
+    </div>
+
+    <script>
         document.getElementById('uploadForm').onsubmit = async function(e) {
             e.preventDefault();
             const formData = new FormData(this);
             const resultDiv = document.getElementById('result-message');
             const downloadSection = document.getElementById('download-section');
             
-            // NEW: Create a warning div if it doesn't exist
+            // Create a warning div if it doesn't exist
             let warningDiv = document.getElementById('warning-message');
             if (!warningDiv) {
                 warningDiv = document.createElement('div');
@@ -28,7 +81,7 @@
                     resultDiv.style.color = "green";
                     downloadSection.style.display = 'block';
                     
-                    // NEW: Display warnings if constraints were forced
+                    // Display warnings if constraints were forced
                     if (data.warnings && data.warnings.length > 0) {
                         let html = "<h4 style='margin-top:0;'>⚠️ Scheduling Constraints Bypassed</h4><p style='font-size: 14px;'>To ensure all required classes were scheduled, the following compromises were made:</p><ul style='font-size: 14px;'>";
                         data.warnings.forEach(w => { html += `<li>${w}</li>`; });
@@ -46,3 +99,5 @@
             }
         };
     </script>
+</body>
+</html>
