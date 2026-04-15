@@ -96,7 +96,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
         return is_adj
 
     # --- PRE-PROCESS PARTIALLY FILLED TIMETABLE ---
-    # We removed the blanket try-except here so validation errors can successfully crash the process and alert the user
     if partial_tt_path.endswith('.xlsx'): df_partial = pd.read_excel(partial_tt_path, header=None)
     else: df_partial = pd.read_csv(partial_tt_path, header=None)
     
@@ -125,13 +124,25 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                     if key in CHMap:
                         CHMap[key] -= 1  
                         for t in CTMap[key]['teachers']: 
-                            # NEW: Strict validation check
-                            if TS.get(t, {}).get(slot) == 'BUSY':
+                            existing_status = TS.get(t, {}).get(slot)
+                            
+                            # Validation 1: Hard Crash if mapped to a user-defined Unsuitable Slot
+                            if existing_status == 'BUSY':
                                 d_name = day_names[slot // periods_per_day]
                                 p_label = period_labels[slot % periods_per_day]
                                 raise ValueError(f"Conflict Error: Teacher '{t}' is pre-assigned to class '{class_id}' for '{val}' on {d_name} ({p_label}) in your Partially Filled file, but you marked this slot as Unsuitable for them!")
                             
-                            TS[t][slot] = class_id 
+                            # Validation 2: Strong Warning + Comma Concatenation if double-booked
+                            elif existing_status and class_id not in [x.strip() for x in existing_status.split(',')]:
+                                d_name = day_names[slot // periods_per_day]
+                                p_label = period_labels[slot % periods_per_day]
+                                warnings.append(f"🚨 <b>STRONG WARNING:</b> Double Booking in Partial File! Teacher <b>{t}</b> is manually assigned to both class <b>{existing_status}</b> and class <b>{class_id}</b> during <b>{d_name} ({p_label})</b>. Please verify if this is intentional (e.g., a combined class session).")
+                                
+                                # CRITICAL FIX: Append the new class with a comma instead of overwriting
+                                TS[t][slot] = f"{existing_status}, {class_id}"
+                            
+                            else:
+                                TS[t][slot] = class_id 
                 slot += 1
 
     # --- MAXIMALLY DISTANT SLOT-FILLING WITH TWO-PASS SOFT CONSTRAINTS ---
