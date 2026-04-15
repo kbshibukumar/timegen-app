@@ -248,5 +248,71 @@
             }
         };
     </script>
+	<div id="chat-widget" style="position: fixed; bottom: 20px; right: 20px; z-index: 1000;">
+    <button id="chat-toggle" style="background-color: #0056b3; color: white; border: none; border-radius: 50%; width: 60px; height: 60px; font-size: 24px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.2);">💬</button>
+    
+    <div id="chat-window" style="display: none; width: 320px; height: 400px; background: white; border-radius: 10px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); flex-direction: column; position: absolute; bottom: 70px; right: 0; overflow: hidden;">
+        <div style="background: #0056b3; color: white; padding: 15px; font-weight: bold;">TimeGen Assistant</div>
+        
+        <div id="chat-messages" style="flex: 1; padding: 15px; overflow-y: auto; font-size: 14px; background: #f9fbfd; display: flex; flex-direction: column; gap: 10px;">
+            <div style="background: #e9ecef; padding: 10px; border-radius: 8px; align-self: flex-start; max-width: 85%;">Hi! I'm the TimeGen expert. Ask me how to format your files or use Unsuitable Slots!</div>
+        </div>
+        
+        <div style="padding: 10px; border-top: 1px solid #ddd; display: flex; background: white;">
+            <input type="text" id="chat-input" placeholder="Ask a question..." style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; margin-right: 5px;">
+            <button id="chat-send" style="background: #28a745; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">Send</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const chatToggle = document.getElementById('chat-toggle');
+    const chatWindow = document.getElementById('chat-window');
+    const chatInput = document.getElementById('chat-input');
+    const chatSend = document.getElementById('chat-send');
+    const chatMessages = document.getElementById('chat-messages');
+
+    chatToggle.addEventListener('click', () => {
+        chatWindow.style.display = chatWindow.style.display === 'none' ? 'flex' : 'none';
+    });
+
+    chatSend.addEventListener('click', async () => {
+        const msg = chatInput.value.trim();
+        if (!msg) return;
+
+        // Append user message
+        chatMessages.innerHTML += `<div style="background: #0056b3; color: white; padding: 10px; border-radius: 8px; align-self: flex-end; max-width: 85%;">${msg}</div>`;
+        chatInput.value = '';
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        // Show typing indicator
+        const typingId = "typing-" + Date.now();
+        chatMessages.innerHTML += `<div id="${typingId}" style="background: #e9ecef; color: #555; padding: 10px; border-radius: 8px; align-self: flex-start; max-width: 85%; font-style: italic;">Typing...</div>`;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        try {
+            const response = await fetch('/ask_bot', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            });
+            const data = await response.json();
+            
+            document.getElementById(typingId).remove();
+            
+            if (response.ok) {
+                chatMessages.innerHTML += `<div style="background: #e9ecef; padding: 10px; border-radius: 8px; align-self: flex-start; max-width: 85%;">${data.response}</div>`;
+            } else {
+                chatMessages.innerHTML += `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 8px; align-self: flex-start; max-width: 85%;">Error: ${data.error}</div>`;
+            }
+        } catch (e) {
+            document.getElementById(typingId).remove();
+            chatMessages.innerHTML += `<div style="background: #f8d7da; color: #721c24; padding: 10px; border-radius: 8px; align-self: flex-start; max-width: 85%;">Network Error.</div>`;
+        }
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    });
+
+    chatInput.addEventListener('keypress', (e) => { if (e.key === 'Enter') chatSend.click(); });
+</script>
 </body>
 </html>

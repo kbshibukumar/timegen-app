@@ -1,3 +1,4 @@
+from chatbot import ask_timegen_bot
 from flask import Flask, request, render_template, jsonify, send_file
 import os
 import json
@@ -124,6 +125,19 @@ def download_sample_partial():
 @app.route('/help')
 def help_page():
     return render_template('help.html')
+
+@app.route('/ask_bot', methods=['POST'])
+def ask_bot():
+    user_message = request.json.get('message')
+    if not user_message:
+        return jsonify({'error': 'No message provided'}), 400
+    
+    try:
+        # Send the question to our RAG engine
+        bot_response = ask_timegen_bot(user_message)
+        return jsonify({'response': bot_response})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 	
 if __name__ == '__main__':
     app.run(debug=True)

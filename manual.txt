@@ -1,0 +1,78 @@
+
+
+# TimeGen: Automated Timetable Generator
+**User & Administrator Reference Guide**
+
+Welcome to TimeGen! This tool automates the complex task of scheduling academic classes, labs, and faculty workloads while mathematically balancing scheduling constraints.
+
+---
+
+## 1. Quick Start Guide
+If your data is already prepared, generating a timetable takes just three steps:
+
+1. **Set your parameters:** Enter the number of working days and periods per day. *(Note: Include lunch/breaks as a period!)*
+2. **Upload your Excel files:** Upload your "Course-Teacher Mapping" and your "Partially Filled Timetable".
+3. **Click Generate:** Review any warnings, and download your finalized Class Matrices and Faculty Workloads.
+
+---
+
+## 2. Preparing Your Excel Files
+The algorithm relies strictly on the formatting of your Excel files. Please download the template files from the right-hand panel of the home screen to ensure proper formatting.
+
+### A. The Course-Teacher Mapping File
+This file tells the system what needs to be scheduled, who is teaching it, and how the teachers should be allocated.
+
+* **Class Auto-Fill:** You only need to type the Class Name (e.g., "S1A") once. You can leave the cells below it blank, and the system will automatically group the following subjects under that class.
+* **Naming & Spelling Rules:** The system is very strict about exact spelling, but forgiving about capitalization and extra spacing. You must be consistent across both Excel files.
+    * **Case & Spaces:** The system ignores capital letters and extra spaces. `Discrete Maths`, `discrete maths`, and `DISCRETE    MATHS` are all recognized as the exact same course.
+    * **Missing Spaces:** A missing space changes the word. `Discrete Maths` and `DiscreteMaths` will be treated as two entirely different courses.
+    * **Abbreviations:** The system cannot guess abbreviations. `Maths` and `Mathematics` will be treated as two different courses. 
+    * **Teacher Names:** This rule applies to faculty as well. `Prof. Smith` and `Prof Smith` (missing the period) or `Prof.Smith` (missing the space) will be treated as three completely different people. **Pick one exact spelling and stick to it!**
+    * **Class-Specific Courses:** The system treats subjects with the exact same name as completely different courses if they belong to different classes. For example, "Maths" for S1 and "Maths" for S3 are calculated and scheduled independently.
+* **Course Types (L vs O):** The "Type" column tells the algorithm how to handle multiple teachers assigned to the same subject.
+    * **L (Lecture):** This is the default type. If you assign multiple teachers to an "L" course (e.g., Prof. Smith, Prof. Davis), the system assumes they are sharing the workload. It will split the total periods between them, ensuring they are never scheduled for the same class at the same time.
+    * **O (Other / Simultaneous / Parallel Labs):** Use this for Labs, Workshops, or Major Projects where multiple teachers must be present at once. The system will find a slot where ALL listed teachers are free and lock them all into that exact same period simultaneously.
+        * **Running Parallel Subjects:** If two different subjects must run at the exact same time (e.g., half the class is in Physics Lab while the other half is in C Lab), treat them as a single combined course. Specify the Course Name as **Physics / C Lab**, set the Type to **O**, and list ALL the teachers for both labs separated by commas. The system will ensure they are all scheduled together in parallel.
+* **Mixed Lecture & Tutorial Courses:** If a subject has a mix of standard lectures (1 teacher) and multi-teacher tutorials, you must split it into two separate rows in your Excel file. For example, if Maths requires 3 total periods per week (2 regular lectures and 1 multi-teacher tutorial):
+    * **Row 1 (Lectures):** Course = **Maths**, Type = **L**, Hours = **2**, Teacher = **Prof. Smith**
+    * **Row 2 (Tutorial):** Course = **Maths (T)**, Type = **O**, Hours = **1**, Teacher = **Prof. Smith, Prof. Davis, Prof. Allen**
+
+### B. The Partially Filled Timetable
+This file allows you to "hard-lock" specific subjects or breaks into specific times. 
+
+* **Setting Breaks:** To lock a common break, type **BREAK** (or LUNCH) into that specific period column for all classes. The algorithm will skip this slot when assigning academic subjects.
+* **Locking a Subject:** If you want Maths to always be on Monday Period 1 for S1A, just type "MATHS" into that cell. 
+* **Dynamic Column Names:** The system reads Row 2 of this file to name your periods. If you type "1, 2, 3, BREAK, 4", the downloaded Teacher Workload will use those exact labels (e.g., Mon-BREAK).
+
+---
+
+## 3. Advanced Scheduling Features
+
+### Feature 1: Blocking Teacher Availability (Unsuitable Slots)
+If a faculty member has administrative duties, **is taking classes in other departments**, or is simply unavailable on specific days/periods, you can block them out before generating the timetable.
+
+1. Upload your Course-Teacher mapping file first. 
+2. A blue "Block Teacher Availability" menu will appear.
+3. Select the Teacher, the Day, and the Period they are unavailable, and click "Add Rule". 
+4. The system will absolutely refuse to schedule them during those times.
+
+### Feature 2: Intentional Double-Booking (Combined Classes)
+There are specific academic scenarios where you want one teacher to teach two different classes at the exact same time:
+* **Combined Seminars/Lectures:** Bringing S1A and S1B together in a main hall for a single core lecture.
+* **Shared Electives:** When students from different branches take the same elective course simultaneously.
+
+**How to do it:** In your Partially Filled Timetable, simply type the subject into the exact same slot for both classes (e.g., Put "SEMINAR" in Monday Period 2 for both S1A and S1B). As long as the same teacher is mapped to that course in your Course-Teacher file, the system will combine them. 
+*(Note: The system will generate a "Strong Warning" just to ensure this wasn't a typo, but it will successfully generate the schedule and format the Teacher's Workload Excel sheet to read: "S1A, S1B").*
+
+---
+
+## 4. Understanding Alerts and Warnings
+Timetable generation is mathematically complex (an NP-Hard problem). TimeGen will always try its absolute best to complete the schedule, but it may have to make compromises if constraints are too tight. 
+
+If compromises are made, a warning box will appear on your screen:
+
+* **[SOFT WARNING] Teacher Continuity Forced:** The system tries to give teachers a break between classes. If the schedule is too packed, it may be forced to assign a teacher back-to-back periods to ensure the required syllabus hours are met. This warning simply notifies you of who was affected and when.
+
+* **[STRONG WARNING] Double Booking in Partial File:** As mentioned in Feature 2, the system detected that you manually scheduled a teacher for two classes at once. This warning is a safety net allowing you to verify that this was an intentional combined session and not a data-entry typo.
+
+* **[HARD ERROR] CRITICAL FAILURE - Failed to Allocate Period:** The constraints you provided were mathematically impossible to resolve. For example, a class needed 4 Maths periods, but the required teacher was blocked via Unsuitable Slots or busy teaching other classes for the entire week. The system will skip the impossible period so it doesn't crash, but you will need to manually adjust your inputs or manually place this missing class in the downloaded Excel file.
