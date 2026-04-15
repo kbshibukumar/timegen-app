@@ -2,24 +2,23 @@ import os
 from langchain_community.document_loaders import TextLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_google_genai import ChatGoogleGenerativeAI, GoogleGenerativeAIEmbeddings
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
 
-# 1. Setup the AI (You will need to set an environment variable named GOOGLE_API_KEY)
+# 1. Setup the AI Chat Model
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
 
-# 2. Setup the free local embedding model
-embeddings = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+# 2. Setup the Google Embeddings Model (This replaces the heavy local model!)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
 
 def initialize_knowledge_base():
     # 3. Load the manual
     loader = TextLoader("manual.txt")
     docs = loader.load()
 
-    # 4. Chop the manual into small, searchable chunks
+    # 4. Chop the manual into small chunks
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=500, chunk_overlap=50)
     splits = text_splitter.split_documents(docs)
 
