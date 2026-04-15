@@ -11,7 +11,10 @@
         .header-section img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         .header-section h2 { margin: 15px 0 5px 0; color: #444; font-size: 22px; }
         .header-section h1 { margin: 0; color: #0056b3; font-size: 28px; }
-        .header-section p { color: #666; margin-top: 10px; }
+        .header-section p { color: #666; margin-top: 10px; margin-bottom: 5px; font-size: 16px; }
+        .citation { font-size: 12px; color: #777; margin-top: 5px; line-height: 1.5; padding: 0 20px; font-style: italic; }
+        .citation a { color: #0056b3; text-decoration: none; }
+        .citation a:hover { text-decoration: underline; }
         .form-group { margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; color: #333;}
         input[type="file"], input[type="number"], select { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
@@ -29,10 +32,13 @@
 
     <div class="container">
         <div class="header-section">
-            <img src="{{ url_for('static', filename='banner.png') }}" alt="Rajiv Gandhi Institute of Technology Banner">
+            <img src="{{ url_for('static', filename='banner.PNG') }}" alt="Rajiv Gandhi Institute of Technology Banner">
             <h2>Department of Computer Science and Engineering</h2>
             <h1>TimeGen</h1>
             <p>Automated Academic Timetable Generator</p>
+            <p class="citation">
+                Based on the paper K. B. S. Kumar, M. S., M. Shaji, P. L. Priya and S. E. Justin, "A Novel Slot Filling Algorithm for Automated Time Table Generation of Academic Institutions," 2025 6th International Conference on Control, Communication and Computing (ICCC), Thiruvanathapuram, India, 2025, pp. 1-6, doi: <a href="https://doi.org/10.1109/ICCC64910.2025.11077271" target="_blank">10.1109/ICCC64910.2025.11077271</a>
+            </p>
         </div>
 
         <form id="uploadForm">
@@ -137,67 +143,4 @@
         });
 
         function updateRulesUI() {
-            document.getElementById('unsuitable_slots').value = JSON.stringify(rules);
-            const ul = document.getElementById('rulesList');
-            ul.innerHTML = '';
-            rules.forEach((r, idx) => {
-                const li = document.createElement('li');
-                li.style.marginBottom = '8px';
-                li.style.fontSize = '14px';
-                li.innerHTML = `❌ ${r.label} <button type="button" onclick="removeRule(${idx})" style="margin-left:15px; padding:4px 8px; background:#dc3545; border:none; color:white; cursor:pointer; border-radius:3px; font-size:12px; font-weight:bold;">Remove</button>`;
-                ul.appendChild(li);
-            });
-        }
-
-        window.removeRule = function(idx) {
-            rules.splice(idx, 1);
-            updateRulesUI();
-        };
-
-        document.getElementById('uploadForm').onsubmit = async function(e) {
-            e.preventDefault();
-            const formData = new FormData(this);
-            const resultDiv = document.getElementById('result-message');
-            const downloadSection = document.getElementById('download-section');
-            
-            let warningDiv = document.getElementById('warning-message');
-            if (!warningDiv) {
-                warningDiv = document.createElement('div');
-                warningDiv.id = 'warning-message';
-                warningDiv.style.cssText = "display: none; color: #856404; background-color: #fff3cd; padding: 15px; margin-top: 20px; border: 1px solid #ffeeba; border-radius: 5px;";
-                downloadSection.parentNode.insertBefore(warningDiv, downloadSection);
-            }
-            
-            resultDiv.innerText = "Generating timetable... Please wait.";
-            resultDiv.style.color = "#0056b3";
-            downloadSection.style.display = 'none';
-            warningDiv.style.display = 'none';
-
-            try {
-                const response = await fetch('/generate', { method: 'POST', body: formData });
-                const data = await response.json();
-                
-                if (response.ok) {
-                    resultDiv.innerText = "✅ " + data.message;
-                    resultDiv.style.color = "green";
-                    downloadSection.style.display = 'block';
-                    
-                    if (data.warnings && data.warnings.length > 0) {
-                        let html = "<h4 style='margin-top:0;'>⚠️ Generation Alerts & Warnings</h4><ul style='font-size: 15px; line-height: 1.5;'>";
-                        data.warnings.forEach(w => { html += `<li style="margin-bottom: 8px;">${w}</li>`; });
-                        html += "</ul>";
-                        warningDiv.innerHTML = html;
-                        warningDiv.style.display = 'block';
-                    }
-                } else {
-                    resultDiv.innerText = "❌ Error: " + data.error;
-                    resultDiv.style.color = "#dc3545";
-                }
-            } catch (error) {
-                resultDiv.innerText = "❌ A network error occurred.";
-                resultDiv.style.color = "#dc3545";
-            }
-        };
-    </script>
-</body>
-</html>
+            document.getElementById('unsuitable_slots').
