@@ -10,7 +10,7 @@ from langchain_classic.chains.combine_documents import create_stuff_documents_ch
 from langchain_core.prompts import ChatPromptTemplate
 
 # 1. Setup the AI Chat Model
-llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.2)
 
 # 2. Setup the Google Embeddings Model 
 embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
