@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.2)
 
 # 2. Setup the Google Embeddings Model 
-embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004"))
 
 def initialize_knowledge_base():
     # 3. Load the manual
