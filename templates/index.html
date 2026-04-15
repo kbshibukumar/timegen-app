@@ -14,14 +14,12 @@
         .header-section p { color: #666; margin-top: 10px; margin-bottom: 5px; font-size: 16px; }
         .citation { font-size: 12px; color: #777; margin-top: 5px; line-height: 1.5; padding: 0 20px; font-style: italic; }
         .citation a { color: #0056b3; text-decoration: none; }
-        .citation a:hover { text-decoration: underline; }
         .form-group { margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; color: #333;}
         input[type="file"], input[type="number"], select { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
         button { background-color: #0056b3; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 4px; font-weight: bold; width: 100%;}
         button:hover { background-color: #004494; }
         .download-btn { background-color: #28a745; display: inline-block; text-decoration: none; margin-right: 10px; margin-top: 20px; padding: 12px 20px; color: white; border-radius: 4px; font-weight: bold;}
-        .download-btn:hover { background-color: #218838; }
         #result-message { margin-top: 20px; font-weight: bold; text-align: center; font-size: 18px;}
         .combo-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px;}
         .combo-row select { margin-bottom: 0; }
@@ -32,12 +30,12 @@
 
     <div class="container">
         <div class="header-section">
-            <img src="{{ url_for('static', filename='banner.PNG') }}" alt="Rajiv Gandhi Institute of Technology Banner">
+            <img src="{{ url_for('static', filename='banner.PNG') }}" onerror="this.src='{{ url_for('static', filename='banner.png') }}';" alt="RIT Banner">
             <h2>Department of Computer Science and Engineering</h2>
             <h1>TimeGen</h1>
             <p>Automated Academic Timetable Generator</p>
             <p class="citation">
-                Based on the paper K. B. S. Kumar, M. S., M. Shaji, P. L. Priya and S. E. Justin, "A Novel Slot Filling Algorithm for Automated Time Table Generation of Academic Institutions," 2025 6th International Conference on Control, Communication and Computing (ICCC), Thiruvananthapuram, India, 2025, pp. 1-6, doi: <a href="https://doi.org/10.1109/ICCC64910.2025.11077271" target="_blank">10.1109/ICCC64910.2025.11077271</a>
+                Based on the paper K. B. S. Kumar, M. S., M. Shaji, P. L. Priya and S. E. Justin, "A Novel Slot Filling Algorithm for Automated Time Table Generation of Academic Institutions," 2025 6th International Conference on Control, Communication and Computing (ICCC), Thiruvanathapuram, India, 2025, pp. 1-6, doi: <a href="https://doi.org/10.1109/ICCC64910.2025.11077271" target="_blank">10.1109/ICCC64910.2025.11077271</a>
             </p>
         </div>
 
@@ -48,7 +46,7 @@
             </div>
 
             <div class="form-group">
-                <label for="periods_per_day">Periods per Day <span style="font-weight: normal; color: #777;">(Include breaks as separate periods)</span>:</label>
+                <label for="periods_per_day">Periods per Day <small>(Includes breaks)</small>:</label>
                 <input type="number" id="periods_per_day" name="periods_per_day" value="7" min="1" required>
             </div>
 
@@ -64,35 +62,43 @@
 
             <div id="unsuitable_ui" style="display:none; background:#f4f7f6; padding:20px; border-left: 4px solid #17a2b8; margin-bottom:20px; border-radius: 4px;">
                 <h3 style="margin-top:0; color: #17a2b8;">Block Teacher Availability</h3>
-                <p style="font-size: 14px; color: #555;">Select a teacher and block out specific periods where they cannot be assigned.</p>
                 <div class="combo-row">
-                    <select id="us_teacher" style="flex: 2;"><option value="">-- Select Teacher --</option></select>
-                    <select id="us_day" style="flex: 1;"></select>
-                    <select id="us_period" style="flex: 1.5;"></select>
+                    <select id="us_teacher"><option value="">-- Select Teacher --</option></select>
+                    <select id="us_day"></select>
+                    <select id="us_period"></select>
                     <button type="button" id="btnAddRule">Add Rule</button>
                 </div>
-                <ul id="rulesList" style="list-style-type: none; padding: 0;"></ul>
+                <ul id="rulesList" style="list-style: none; padding: 0; font-size: 14px;"></ul>
                 <input type="hidden" name="unsuitable_slots" id="unsuitable_slots" value="[]">
             </div>
 
-            <button type="submit">Generate Timetable</button>
+            <button type="submit" id="btnGenerate">Generate Timetable</button>
         </form>
 
         <div id="result-message"></div>
-
         <div id="download-section" style="display: none; text-align: center;">
-            <a href="/download/class_timetable" class="download-btn">⬇️ Download Class Matrices</a>
-            <a href="/download/teacher_timetable" class="download-btn">⬇️ Download Teacher Workloads</a>
+            <a href="/download/class_timetable" class="download-btn">Download Class Timetable</a>
+            <a href="/download/teacher_timetable" class="download-btn">Download Teacher Timetable</a>
         </div>
     </div>
 
     <script>
         let rules = [];
 
-        const inputsToWatch = ['course_teacher', 'partial_tt', 'working_days', 'periods_per_day'];
-        inputsToWatch.forEach(id => {
-            document.getElementById(id).addEventListener('change', fetchMetadata);
-        });
+        // Attach listeners safely
+        window.onload = function() {
+            const inputs = ['course_teacher', 'partial_tt', 'working_days', 'periods_per_day'];
+            inputs.forEach(id => {
+                const el = document.getElementById(id);
+                if(el) el.addEventListener('change', fetchMetadata);
+            });
+
+            const btnAdd = document.getElementById('btnAddRule');
+            if(btnAdd) btnAdd.addEventListener('click', addRule);
+
+            const form = document.getElementById('uploadForm');
+            if(form) form.onsubmit = handleFormSubmit;
+        };
 
         async function fetchMetadata() {
             const ctFile = document.getElementById('course_teacher').files[0];
@@ -106,7 +112,7 @@
                     populateCombos(data);
                     document.getElementById('unsuitable_ui').style.display = 'block';
                 }
-            } catch (e) { console.error("Could not fetch metadata"); }
+            } catch (e) { console.log("Metadata parse waiting for files..."); }
         }
 
         function populateCombos(data) {
@@ -114,33 +120,77 @@
             const dSel = document.getElementById('us_day');
             const pSel = document.getElementById('us_period');
             
-            tSel.innerHTML = '<option value="">-- Select Teacher --</option>';
-            data.teachers.forEach(t => tSel.innerHTML += `<option value="${t}">${t}</option>`);
-            
-            dSel.innerHTML = '';
-            data.days.forEach((d, i) => dSel.innerHTML += `<option value="${i}">${d}</option>`);
-            
-            pSel.innerHTML = '';
-            data.period_labels.forEach((p, i) => pSel.innerHTML += `<option value="${i}">${p}</option>`);
+            if(tSel) {
+                tSel.innerHTML = '<option value="">-- Select Teacher --</option>';
+                data.teachers.forEach(t => tSel.innerHTML += `<option value="${t}">${t}</option>`);
+            }
+            if(dSel) {
+                dSel.innerHTML = '';
+                data.days.forEach((d, i) => dSel.innerHTML += `<option value="${i}">${d}</option>`);
+            }
+            if(pSel) {
+                pSel.innerHTML = '';
+                data.period_labels.forEach((p, i) => pSel.innerHTML += `<option value="${i}">${p}</option>`);
+            }
         }
 
-        document.getElementById('btnAddRule').addEventListener('click', function() {
+        function addRule() {
             const tSel = document.getElementById('us_teacher');
             const dSel = document.getElementById('us_day');
             const pSel = document.getElementById('us_period');
-            
-            if(!tSel.value) return alert("Please select a teacher.");
-            
+            if(!tSel.value) return alert("Select a teacher first.");
+
             const rule = {
                 teacher: tSel.value,
                 day: parseInt(dSel.value),
                 period: parseInt(pSel.value),
-                label: `<b>${tSel.value}</b> cannot teach on <b>${dSel.options[dSel.selectedIndex].text}</b> during <b>${pSel.options[pSel.selectedIndex].text}</b>`
+                label: `${tSel.value} - ${dSel.options[dSel.selectedIndex].text} (${pSel.options[pSel.selectedIndex].text})`
             };
-            
             rules.push(rule);
             updateRulesUI();
-        });
+        }
 
         function updateRulesUI() {
-            document.getElementById('unsuitable_slots').
+            document.getElementById('unsuitable_slots').value = JSON.stringify(rules);
+            const ul = document.getElementById('rulesList');
+            ul.innerHTML = '';
+            rules.forEach((r, i) => {
+                ul.innerHTML += `<li style="margin-bottom:5px;">❌ ${r.label} <button type="button" onclick="removeRule(${i})" style="padding:2px 5px; font-size:10px; background:red; color:white; border:none; cursor:pointer;">Remove</button></li>`;
+            });
+        }
+
+        window.removeRule = function(i) {
+            rules.splice(i, 1);
+            updateRulesUI();
+        };
+
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            const resDiv = document.getElementById('result-message');
+            const dlSec = document.getElementById('download-section');
+            resDiv.innerText = "Processing... please wait.";
+            resDiv.style.color = "blue";
+
+            try {
+                const response = await fetch('/generate', { method: 'POST', body: new FormData(this) });
+                const data = await response.json();
+                if (response.ok) {
+                    resDiv.innerText = "✅ " + data.message;
+                    resDiv.style.color = "green";
+                    dlSec.style.display = 'block';
+                    if(data.warnings && data.warnings.length > 0) {
+                        alert("Timetable generated with some warnings. Please check the screen.");
+                        // Optional: render warnings to a div here
+                    }
+                } else {
+                    resDiv.innerText = "❌ " + data.error;
+                    resDiv.style.color = "red";
+                }
+            } catch (err) {
+                resDiv.innerText = "❌ Network error. Check server logs.";
+                resDiv.style.color = "red";
+            }
+        }
+    </script>
+</body>
+</html>
