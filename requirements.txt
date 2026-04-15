@@ -6,5 +6,6 @@ gunicorn==21.2.0
 werkzeug==3.0.0
 langchain
 langchain-community
+langchain-classic
 langchain-google-genai
 faiss-cpu
