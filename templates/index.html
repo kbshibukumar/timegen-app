@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TimeGen - Automated Scheduling</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f9fbfd; }
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 40px auto; padding: 20px; background-color: #f9fbfd; }
         .container { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
         .header-section { text-align: center; margin-bottom: 30px; }
         .header-section img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
@@ -15,21 +15,39 @@
         .citation { font-size: 12px; color: #777; margin-top: 5px; line-height: 1.5; padding: 0 20px; font-style: italic; }
         .citation a { color: #0056b3; text-decoration: none; }
         .citation a:hover { text-decoration: underline; }
+        
+        /* NEW: Flexbox Layout */
+        .main-layout { display: flex; gap: 30px; align-items: flex-start; margin-top: 20px;}
+        .left-column { flex: 2; }
+        .right-column { flex: 1; background-color: #f4f7f6; padding: 20px; border-radius: 8px; border: 1px solid #e1e8ed; }
+        
+        .right-column h3 { margin-top: 0; color: #333; font-size: 18px; border-bottom: 2px solid #0056b3; padding-bottom: 8px;}
+        .right-column p { font-size: 14px; color: #555; line-height: 1.5; margin-bottom: 15px;}
+        
+        .sample-btn { display: block; width: 100%; box-sizing: border-box; text-align: center; background-color: #6c757d; color: white; padding: 10px; margin-bottom: 10px; text-decoration: none; border-radius: 4px; font-size: 14px; font-weight: bold; transition: background 0.2s;}
+        .sample-btn:hover { background-color: #5a6268; }
+
         .form-group { margin-bottom: 20px; }
         label { display: block; font-weight: bold; margin-bottom: 5px; color: #333;}
         input[type="file"], input[type="number"], select { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
-        button { background-color: #0056b3; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 4px; font-weight: bold; width: 100%;}
-        button:hover { background-color: #004494; }
+        button[type="submit"] { background-color: #0056b3; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 4px; font-weight: bold; width: 100%; transition: background 0.2s;}
+        button[type="submit"]:hover { background-color: #004494; }
+        
         .download-btn { background-color: #28a745; display: inline-block; text-decoration: none; margin-right: 10px; margin-top: 20px; padding: 12px 20px; color: white; border-radius: 4px; font-weight: bold;}
         .download-btn:hover { background-color: #218838; }
-        #result-message { margin-top: 20px; font-weight: bold; text-align: center; font-size: 18px;}
         
-        /* NEW: Pre-styled warning box baked into the CSS */
+        #result-message { margin-top: 20px; font-weight: bold; text-align: center; font-size: 18px;}
         #warning-message { display: none; color: #856404; background-color: #fff3cd; padding: 20px; margin-top: 20px; border: 1px solid #ffeeba; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
         
         .combo-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px;}
         .combo-row select { margin-bottom: 0; }
-        .combo-row button { width: auto; background-color: #17a2b8; padding: 10px 15px; }
+        .combo-row button { width: auto; background-color: #17a2b8; padding: 10px 15px; border: none; color: white; border-radius: 4px; cursor: pointer;}
+
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .main-layout { flex-direction: column; }
+            .right-column { width: 100%; box-sizing: border-box; }
+        }
     </style>
 </head>
 <body>
@@ -45,45 +63,68 @@
             </p>
         </div>
 
-        <form id="uploadForm">
-            <div class="form-group">
-                <label for="working_days">Working Days per Week:</label>
-                <input type="number" id="working_days" name="working_days" value="5" min="1" max="7" required>
+        <div class="main-layout">
+            <div class="left-column">
+                <form id="uploadForm">
+                    <div class="form-group">
+                        <label for="working_days">Working Days per Week:</label>
+                        <input type="number" id="working_days" name="working_days" value="5" min="1" max="7" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="periods_per_day">Periods per Day <span style="font-weight: normal; color: #777;">(Include breaks as separate periods)</span>:</label>
+                        <input type="number" id="periods_per_day" name="periods_per_day" value="8" min="1" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="partial_tt">Partially Filled Timetable (Excel/CSV):</label>
+                        <input type="file" id="partial_tt" name="partial_tt" accept=".xlsx, .xls, .csv" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="course_teacher">Course-Teacher Mapping (Excel/CSV):</label>
+                        <input type="file" id="course_teacher" name="course_teacher" accept=".xlsx, .xls, .csv" required>
+                    </div>
+
+                    <div id="unsuitable_ui" style="display:none; background:#f4f7f6; padding:20px; border-left: 4px solid #17a2b8; margin-bottom:20px; border-radius: 4px;">
+                        <h3 style="margin-top:0; color: #17a2b8;">Block Teacher Availability</h3>
+                        <p style="font-size: 14px; color: #555;">Select a teacher and block out specific periods where they cannot be assigned.</p>
+                        <div class="combo-row">
+                            <select id="us_teacher" style="flex: 2;"><option value="">-- Select Teacher --</option></select>
+                            <select id="us_day" style="flex: 1;"></select>
+                            <select id="us_period" style="flex: 1.5;"></select>
+                            <button type="button" id="btnAddRule">Add Rule</button>
+                        </div>
+                        <ul id="rulesList" style="list-style-type: none; padding: 0;"></ul>
+                        <input type="hidden" name="unsuitable_slots" id="unsuitable_slots" value="[]">
+                    </div>
+
+                    <button type="submit">Generate Timetable</button>
+                </form>
             </div>
 
-            <div class="form-group">
-                <label for="periods_per_day">Periods per Day <span style="font-weight: normal; color: #777;">(Include breaks as separate periods)</span>:</label>
-                <input type="number" id="periods_per_day" name="periods_per_day" value="7" min="1" required>
-            </div>
-
-            <div class="form-group">
-                <label for="partial_tt">Partially Filled Timetable (Excel/CSV):</label>
-                <input type="file" id="partial_tt" name="partial_tt" accept=".xlsx, .xls, .csv" required>
-            </div>
-
-            <div class="form-group">
-                <label for="course_teacher">Course-Teacher Mapping (Excel/CSV):</label>
-                <input type="file" id="course_teacher" name="course_teacher" accept=".xlsx, .xls, .csv" required>
-            </div>
-
-            <div id="unsuitable_ui" style="display:none; background:#f4f7f6; padding:20px; border-left: 4px solid #17a2b8; margin-bottom:20px; border-radius: 4px;">
-                <h3 style="margin-top:0; color: #17a2b8;">Block Teacher Availability</h3>
-                <p style="font-size: 14px; color: #555;">Select a teacher and block out specific periods where they cannot be assigned.</p>
-                <div class="combo-row">
-                    <select id="us_teacher" style="flex: 2;"><option value="">-- Select Teacher --</option></select>
-                    <select id="us_day" style="flex: 1;"></select>
-                    <select id="us_period" style="flex: 1.5;"></select>
-                    <button type="button" id="btnAddRule">Add Rule</button>
+            <div class="right-column">
+                <h3>Templates & Instructions</h3>
+                <p>For the algorithm to successfully parse your data, your Excel files must follow a specific structure.</p>
+                <p>Download the template files below and populate them with your department's specific data before uploading.</p>
+                
+                <div style="margin-top: 20px;">
+                    <a href="/download/sample_partial_tt" class="sample-btn">📄 Download Partially Filled Template</a>
+                    <a href="/download/sample_course_teacher" class="sample-btn">📄 Download Course-Teacher Template</a>
                 </div>
-                <ul id="rulesList" style="list-style-type: none; padding: 0;"></ul>
-                <input type="hidden" name="unsuitable_slots" id="unsuitable_slots" value="[]">
-            </div>
 
-            <button type="submit">Generate Timetable</button>
-        </form>
+                <div style="margin-top: 25px; border-top: 1px solid #ddd; padding-top: 15px;">
+                    <h4 style="margin-top: 0; color: #333; font-size: 15px;">📝 Quick Tips</h4>
+                    <ul style="font-size: 13px; color: #555; padding-left: 15px; line-height: 1.6;">
+                        <li>To lock a Break/Lunch period, write <b>BREAK</b> in the corresponding column across all classes.</li>
+                        <li>To assign multiple faculty to a lab, separate their names with commas (e.g., <i>Smith, Jones</i>).</li>
+                        <li>You may leave the "Class" column blank in subsequent rows; the system will auto-fill it downwards.</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
 
         <div id="result-message"></div>
-
         <div id="warning-message"></div>
 
         <div id="download-section" style="display: none; text-align: center;">
@@ -171,7 +212,7 @@
             const formData = new FormData(this);
             const resultDiv = document.getElementById('result-message');
             const downloadSection = document.getElementById('download-section');
-            const warningDiv = document.getElementById('warning-message'); // Grabbing the hardcoded box
+            const warningDiv = document.getElementById('warning-message');
             
             resultDiv.innerText = "Generating timetable... Please wait.";
             resultDiv.style.color = "#0056b3";
@@ -182,21 +223,17 @@
                 const response = await fetch('/generate', { method: 'POST', body: formData });
                 const data = await response.json();
                 
-                // NEW: Background debugging
-                console.log("Server Payload Received:", data);
-                
                 if (response.ok) {
                     resultDiv.innerText = "✅ " + data.message;
                     resultDiv.style.color = "green";
                     downloadSection.style.display = 'block';
                     
-                    // Activate warning box if warnings exist
                     if (data.warnings && data.warnings.length > 0) {
                         let html = "<h4 style='margin-top:0;'>⚠️ Generation Alerts & Warnings</h4><ul style='font-size: 15px; line-height: 1.5; margin-bottom: 0;'>";
                         data.warnings.forEach(w => { html += `<li style="margin-bottom: 8px;">${w}</li>`; });
                         html += "</ul>";
                         warningDiv.innerHTML = html;
-                        warningDiv.style.display = 'block'; // Make it visible!
+                        warningDiv.style.display = 'block';
                     }
                 } else {
                     resultDiv.innerText = "❌ Error: " + data.error;
