@@ -3,25 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TimeGen - Complete User Reference</title>
+    <title>TimeGen - User & Administrator Reference Guide</title>
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.7; color: #333; max-width: 950px; margin: 0 auto; padding: 40px 20px; background-color: #f0f4f8; }
         .doc-card { background: white; padding: 60px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-top: 8px solid #0056b3; }
         .banner-container { text-align: center; margin-bottom: 40px; }
         .banner-container img { max-width: 80%; height: auto; border-radius: 4px; }
-        h1 { color: #0056b3; font-size: 32px; margin-top: 10px; text-align: center; }
+        h1 { color: #0056b3; font-size: 32px; margin-top: 10px; text-align: center; margin-bottom: 5px; }
         .subtitle { text-align: center; color: #666; font-style: italic; margin-bottom: 30px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
         h2 { color: #0056b3; margin-top: 40px; border-bottom: 2px solid #e1e8ed; padding-bottom: 10px; }
         h3 { color: #004085; margin-top: 25px; }
+        h4 { color: #333; margin-top: 20px; margin-bottom: 10px; }
         code { background: #f1f3f5; padding: 2px 6px; border-radius: 4px; color: #d63384; font-family: 'Consolas', monospace; font-size: 0.95em; }
-        .example-table { width: 100%; border-collapse: collapse; margin: 25px 0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .example-table th, .example-table td { border: 1px solid #dee2e6; padding: 12px 15px; text-align: left; }
+        .example-table { width: 100%; border-collapse: collapse; margin: 20px 0; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .example-table th, .example-table td { border: 1px solid #dee2e6; padding: 10px 15px; text-align: left; }
         .example-table th { background-color: #0056b3; color: white; }
         .warning-box { padding: 20px; border-radius: 8px; margin: 25px 0; border-left: 8px solid; }
         .soft { background: #fff3cd; border-color: #ffc107; color: #856404; }
         .hard { background: #f8d7da; border-color: #dc3545; color: #721c24; }
         .btn-print { float: right; background: #6c757d; color: white; padding: 10px 20px; text-decoration: none; border-radius: 30px; font-weight: bold; font-size: 14px; transition: 0.3s; }
         .btn-print:hover { background: #5a6268; }
+        ul { margin-top: 5px; }
         ul li { margin-bottom: 10px; }
         @media print { .btn-print { display: none; } body { background: white; padding: 0; } .doc-card { box-shadow: none; border: none; padding: 20px; } }
     </style>
@@ -34,85 +36,115 @@
         <div class="banner-container">
             <img src="{{ url_for('static', filename='banner.PNG') }}" alt="RIT Banner">
             <h2>Department of Computer Science and Engineering</h2>
-            <h1>TimeGen: The Complete Reference Guide</h1>
+            <h1>TimeGen: Automated Timetable Generator</h1>
+            <h3 style="text-align: center; margin-top: 0; color: #444;">User & Administrator Reference Guide</h3>
             <p class="subtitle">Based on ICCC 2025 Paper: "A Novel Slot Filling Algorithm for Automated Time Table Generation"</p>
         </div>
 
+        <p>Welcome to TimeGen! This tool automates the complex task of scheduling academic classes, labs, and faculty workloads while mathematically balancing scheduling constraints.</p>
+
         <section>
-            <h2>1. Data Integrity & Naming Rules</h2>
-            <p>The algorithm uses "Fuzzy-insensitive but Literal" matching. Consistency across your Excel files is mandatory for the logic to work.</p>
-            <ul>
-                <li><b>Case & Spaces:</b> The system is case-insensitive. <code>Discrete Maths</code> and <code>discrete maths</code> are seen as identical.</li>
-                <li><b>Literal Spelling:</b> Spelling must be exact. <code>Discrete Maths</code> and <code>DiscreteMaths</code> (missing space) are treated as <b>different courses</b>.</li>
-                <li><b>Abbreviations:</b> The system cannot guess meanings. <code>Maths</code> and <code>Mathematics</code> are considered separate entities.</li>
-                <li><b>Class-Specific Logic:</b> "Maths" in class <b>S1</b> is scheduled independently of "Maths" in class <b>S3</b>.</li>
-                <li><b>Faculty Names:</b> <code>Prof. Smith</code> and <code>Prof Smith</code> (missing period) or <code>Prof.Smith</code> (missing space) are treated as three different people. <b>Always use one exact format.</b></li>
-            </ul>
+            <h2>1. Quick Start Guide</h2>
+            <p>If your data is already prepared, generating a timetable takes just three steps:</p>
+            <ol>
+                <li><b>Set your parameters:</b> Enter the number of working days and periods per day. (<i>Note: Include lunch/breaks as a period!</i>)</li>
+                <li><b>Upload your Excel files:</b> Upload your "Course-Teacher Mapping" and your "Partially Filled Timetable".</li>
+                <li><b>Click Generate:</b> Review any warnings, and download your finalized Class Matrices and Faculty Workloads.</li>
+            </ol>
         </section>
 
         <section>
-            <h2>2. Course-Teacher Mapping</h2>
-            <p>This file defines your department's workload. <b>Only include faculty from your department here</b>, as this file calculates your internal departmental workload.</p>
-            
-            <h3>Course Types (L vs O)</h3>
+            <h2>2. Preparing Your Excel Files</h2>
+            <p>The algorithm relies strictly on the formatting of your Excel files. Please download the template files from the right-hand panel of the home screen to ensure proper formatting.</p>
+
+            <h3>A. The Course-Teacher Mapping File</h3>
+            <p>This file tells the system what needs to be scheduled, who is teaching it, and how the teachers should be allocated. <b>Note: It should contain the names of the teachers from our department only</b> as we are calculating the workload and time table for our department.</p>
+
             <ul>
-                <li><b>Type L (Lecture):</b> Standard distribution. The workload hours are split among the listed teachers.</li>
-                <li><b>Type O (Other / Simultaneous / Parallel):</b> All listed teachers are locked into the <b>same slot simultaneously</b>.</li>
+                <li><b>Class Auto-Fill:</b> You only need to type the Class Name (e.g., "S1A") once. You can leave the cells below it blank, and the system will automatically group the following subjects under that class.</li>
             </ul>
 
-            <h4>Example: Parallel Physics and C Labs</h4>
-            <p>If half the class is in Physics Lab while the other half is in C Lab simultaneously, treat them as a single entry:</p>
+            <h4>Naming & Spelling Rules</h4>
+            <p>The system is very strict about exact spelling, but forgiving about capitalization and extra spacing. You must be consistent across both Excel files.</p>
+            <ul>
+                <li><b>Case & Spaces:</b> The system ignores capital letters and extra spaces. <code>Discrete Maths</code>, <code>discrete maths</code>, and <code>DISCRETE    MATHS</code> are all recognized as the exact same course.</li>
+                <li><b>Missing Spaces:</b> A missing space changes the word. <code>Discrete Maths</code> and <code>DiscreteMaths</code> will be treated as two entirely different courses.</li>
+                <li><b>Abbreviations:</b> The system cannot guess abbreviations. <code>Maths</code> and <code>Mathematics</code> will be treated as two different courses.</li>
+                <li><b>Teacher Names:</b> This rule applies to faculty as well. <code>Prof. Smith</code> and <code>Prof Smith</code> (missing the period) or <code>Prof.Smith</code> (missing the space) will be treated as three completely different people. Pick one exact spelling and stick to it!</li>
+                <li><b>Class-Specific Courses:</b> The system treats subjects with the exact same name as completely different courses if they belong to different classes. For example, "Maths" for S1 and "Maths" for S3 are calculated and scheduled independently.</li>
+            </ul>
+
+            <h4>Course Types (L vs O)</h4>
+            <p>The "Type" column tells the algorithm how to handle multiple teachers assigned to the same subject.</p>
+            <ul>
+                <li><b>L (Lecture):</b> This is the default type. If you assign multiple teachers to an "L" course (e.g., Prof. Smith, Prof. Davis), the system assumes they are sharing the workload. It will split the total periods between them, ensuring they are never scheduled for the same class at the same time.</li>
+                <li><b>O (Other / Simultaneous / Parallel Labs):</b> Use this for Labs, Workshops, or Major Projects where multiple teachers must be present at once. The system will find a slot where ALL listed teachers are free and lock them all into that exact same period simultaneously.</li>
+            </ul>
+
+            <h4>Running Parallel Subjects</h4>
+            <p>If two different subjects must run at the exact same time (e.g., half the class is in Physics Lab while the other half is in C Lab), treat them as a single combined course. Specify the Course Name as <b>Physics / C Lab</b>, set the Type to <b>O</b>, and list ALL the teachers for both labs separated by commas. The system will ensure they are all scheduled together in parallel.</p>
             <table class="example-table">
                 <thead><tr><th>Class</th><th>Course</th><th>Type</th><th>Hours</th><th>Teacher</th></tr></thead>
                 <tbody><tr><td>S1A</td><td>Physics / C Lab</td><td>O</td><td>3</td><td>Prof. A, Prof. B, Prof. C</td></tr></tbody>
             </table>
 
-            <h4>Example: Mixed Lecture & Tutorial Split</h4>
-            <p>If a course has 2 lecture hours (1 teacher) and 1 tutorial hour (multiple teachers):</p>
+            <h4>Mixed Lecture & Tutorial Courses</h4>
+            <p>If you want to specify tutorial periods for a course (e.g., Maths has 3 periods per week of which 1 is a tutorial where multiple teachers are needed), you must split it into two separate rows in your Excel file. Specify the number of periods for Maths as 2 with a single teacher (Type L), and Maths(T) with 1 period and multiple teachers (Type O).</p>
             <table class="example-table">
                 <thead><tr><th>Class</th><th>Course</th><th>Type</th><th>Hours</th><th>Teacher</th></tr></thead>
                 <tbody>
                     <tr><td>S1A</td><td>Maths</td><td>L</td><td>2</td><td>Prof. Smith</td></tr>
-                    <tr><td>S1A</td><td>Maths (T)</td><td>O</td><td>1</td><td>Prof. Smith, Prof. Davis</td></tr>
+                    <tr><td>S1A</td><td>Maths(T)</td><td>O</td><td>1</td><td>Prof. Smith, Prof. Davis, Prof. Allen</td></tr>
                 </tbody>
             </table>
-        </section>
 
-        <section>
-            <h2>3. Partially Filled Timetable</h2>
-            <p>Used to "hard-lock" fixed periods before the automated algorithm begins.</p>
+            <h3>B. The Partially Filled Timetable</h3>
+            <p>This file allows you to "hard-lock" specific subjects or breaks into specific times.</p>
             <ul>
-                <li><b>Breaks:</b> Use <code>BREAK</code> or <code>LUNCH</code> to block slots globally for all classes.</li>
-                <li><b>Internal Subjects:</b> Enter the course name exactly as it appears in the Mapping file to auto-allocate your departmental faculty.</li>
-                <li><b>External Department Subjects:</b> If a class is handled by another department (e.g., <b>Physics</b>), enter it here. Since there is no matching teacher in your departmental mapping file, the system will block the students' time but <b>will not</b> assign any of your faculty to that slot.</li>
-                <li><b>Remedial / Free Periods:</b> Label slots as <code>REMEDIAL</code> to reserve time for students without allocating a teacher.</li>
+                <li><b>Setting Breaks:</b> To lock a common break, type <code>BREAK</code> (or LUNCH) into that specific period column for all classes. The algorithm will skip this slot when assigning academic subjects.</li>
+                <li><b>Locking a Subject:</b> If you want Maths to always be on Monday Period 1 for S1A, just type "MATHS" into that cell.</li>
+                <li><b>External Department Subjects:</b> If a course is offered by another department (e.g., Physics), fixing that slot is still valid. The system will block that period for the students, but no teacher from our department is allocated.</li>
+                <li><b>Remedial / Free Periods:</b> If a period is not to be allocated to any regular class, mark it as <code>REMEDIAL</code> with no teacher allocation.</li>
+                <li><b>Dynamic Column Names:</b> The system reads Row 2 of this file to name your periods. If you type "1, 2, 3, BREAK, 4", the downloaded Teacher Workload will use those exact labels (e.g., Mon-BREAK).</li>
             </ul>
         </section>
 
         <section>
-            <h2>4. Advanced Constraints</h2>
-            <h3>Unsuitable Slots (Teacher Blocking)</h3>
-            <p>Use this for faculty who are unavailable due to administrative duties, research, or <b>taking classes in other departments</b>. Access this via the "Block Teacher Availability" menu after uploading your mapping file.</p>
-
-            <h3>Intentional Double-Booking (Combined Classes)</h3>
-            <p>For shared electives or combined seminars where one teacher handles two classes at once (e.g., S1A and S1B in a main hall):</p>
+            <h2>3. Advanced Scheduling Features</h2>
+            
+            <h3>Feature 1: Blocking Teacher Availability (Unsuitable Slots)</h3>
+            <p>If a faculty member has administrative duties, <b>classes in other departments</b>, or is simply unavailable on specific days/periods, you can block them out before generating the timetable.</p>
             <ol>
-                <li>In the <b>Partial Timetable</b>, place the same subject in the same slot for both classes.</li>
-                <li>In the <b>Mapping File</b>, ensure the same teacher is assigned to that course name for both classes.</li>
+                <li>Upload your Course-Teacher mapping file first.</li>
+                <li>A blue "Block Teacher Availability" menu will appear.</li>
+                <li>Select the Teacher, the Day, and the Period they are unavailable, and click "Add Rule".</li>
+                <li>The system will absolutely refuse to schedule them during those times.</li>
             </ol>
-            <p>The system will flag this with a warning but allow the booking, merging the faculty workload entry as <i>"S1A, S1B"</i>.</p>
+
+            <h3>Feature 2: Intentional Double-Booking (Combined Classes)</h3>
+            <p>There are specific academic scenarios where you want one teacher to teach two different classes at the exact same time:</p>
+            <ul>
+                <li><b>Combined Seminars/Lectures:</b> Bringing S1A and S1B together in a main hall for a single core lecture.</li>
+                <li><b>Shared Electives:</b> When students from different branches take the same elective course simultaneously.</li>
+            </ul>
+            <p><b>How to do it:</b> In your Partially Filled Timetable, simply type the subject into the exact same slot for both classes (e.g., Put "SEMINAR" in Monday Period 2 for both S1A and S1B). As long as the same teacher is mapped to that course in your Course-Teacher file, the system will combine them.</p>
+            <p><i>(Note: The system will generate a "Strong Warning" just to ensure this wasn't a typo, but it will successfully generate the schedule and format the Teacher's Workload Excel sheet to read: "S1A, S1B").</i></p>
         </section>
 
         <section>
-            <h2>5. Alerts & Warnings Decoder</h2>
+            <h2>4. Understanding Alerts and Warnings</h2>
+            <p>Timetable generation is mathematically complex (an NP-Hard problem). TimeGen will always try its absolute best to complete the schedule, but it may have to make compromises if constraints are too tight. If compromises are made, a warning box will appear on your screen:</p>
+            
             <div class="warning-box soft">
-                <b>[SOFT WARNING] Teacher Continuity Forced:</b> The system assigned back-to-back periods to a teacher to ensure all required syllabus hours were met.
+                <b>[SOFT WARNING] Teacher Continuity Forced:</b> The system tries to give teachers a break between classes. If the schedule is too packed, it may be forced to assign a teacher back-to-back periods to ensure the required syllabus hours are met. This warning simply notifies you of who was affected and when.
             </div>
+            
             <div class="warning-box soft">
-                <b>[STRONG WARNING] Double Booking in Partial File:</b> Detected that you manually scheduled a teacher for two classes at once. Verify if this was an intentional combined session.
+                <b>[STRONG WARNING] Double Booking in Partial File:</b> As mentioned in Feature 2, the system detected that you manually scheduled a teacher for two classes at once. This warning is a safety net allowing you to verify that this was an intentional combined session and not a data-entry typo.
             </div>
+            
             <div class="warning-box hard">
-                <b>[HARD ERROR] Failed to Allocate Period:</b> Constraints were mathematically impossible (e.g., the teacher was blocked or busy during all available hours for that class). <b>Action:</b> You must manually assign this missing period in the exported Excel file.
+                <b>[HARD ERROR] CRITICAL FAILURE - Failed to Allocate Period:</b> The constraints you provided were mathematically impossible to resolve. For example, a class needed 4 Maths periods, but the required teacher was blocked via Unsuitable Slots or busy teaching other classes for the entire week. The system will skip the impossible period so it doesn't crash, but you will need to manually adjust your inputs or manually place this missing class in the downloaded Excel file.
             </div>
         </section>
     </div>
