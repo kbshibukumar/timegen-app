@@ -5,71 +5,84 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>TimeGen - Automated Scheduling</title>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; }
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; background-color: #f9fbfd; }
+        .container { background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .header-section { text-align: center; margin-bottom: 30px; }
+        .header-section img { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .header-section h2 { margin: 15px 0 5px 0; color: #444; font-size: 22px; }
+        .header-section h1 { margin: 0; color: #0056b3; font-size: 28px; }
+        .header-section p { color: #666; margin-top: 10px; }
         .form-group { margin-bottom: 20px; }
-        label { display: block; font-weight: bold; margin-bottom: 5px; }
-        input[type="file"], input[type="number"], select { width: 100%; padding: 8px; margin-bottom: 10px; box-sizing: border-box; }
-        button { background-color: #0056b3; color: white; padding: 10px 20px; border: none; cursor: pointer; font-size: 16px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; color: #333;}
+        input[type="file"], input[type="number"], select { width: 100%; padding: 10px; margin-bottom: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px;}
+        button { background-color: #0056b3; color: white; padding: 12px 20px; border: none; cursor: pointer; font-size: 16px; border-radius: 4px; font-weight: bold; width: 100%;}
         button:hover { background-color: #004494; }
-        .download-btn { background-color: #28a745; display: inline-block; text-decoration: none; margin-right: 10px; margin-top: 20px; padding: 10px 15px; color: white;}
-        #result-message { margin-top: 20px; font-weight: bold; }
+        .download-btn { background-color: #28a745; display: inline-block; text-decoration: none; margin-right: 10px; margin-top: 20px; padding: 12px 20px; color: white; border-radius: 4px; font-weight: bold;}
+        .download-btn:hover { background-color: #218838; }
+        #result-message { margin-top: 20px; font-weight: bold; text-align: center; font-size: 18px;}
         .combo-row { display: flex; gap: 10px; align-items: center; margin-bottom: 10px;}
         .combo-row select { margin-bottom: 0; }
+        .combo-row button { width: auto; background-color: #17a2b8; padding: 10px 15px; }
     </style>
 </head>
 <body>
 
-    <h1>TimeGen: Timetable Generator</h1>
-    <p>Upload your configurations to generate the academic timetable.</p>
-
-    <form id="uploadForm">
-        <div class="form-group">
-            <label for="working_days">Working Days per Week:</label>
-            <input type="number" id="working_days" name="working_days" value="5" min="1" max="7" required>
+    <div class="container">
+        <div class="header-section">
+            <img src="{{ url_for('static', filename='banner.png') }}" alt="Rajiv Gandhi Institute of Technology Banner">
+            <h2>Department of Computer Science and Engineering</h2>
+            <h1>TimeGen</h1>
+            <p>Automated Academic Timetable Generator</p>
         </div>
 
-        <div class="form-group">
-            <label for="periods_per_day">Periods per Day <small style="font-weight: normal; color: #555;">(Include breaks as separate periods)</small>:</label>
-            <input type="number" id="periods_per_day" name="periods_per_day" value="7" min="1" required>
-        </div>
-
-        <div class="form-group">
-            <label for="partial_tt">Partially Filled Timetable (Excel/CSV):</label>
-            <input type="file" id="partial_tt" name="partial_tt" accept=".xlsx, .xls, .csv" required>
-        </div>
-
-        <div class="form-group">
-            <label for="course_teacher">Course-Teacher Mapping (Excel/CSV):</label>
-            <input type="file" id="course_teacher" name="course_teacher" accept=".xlsx, .xls, .csv" required>
-        </div>
-
-        <div id="unsuitable_ui" style="display:none; background:#f4f7f6; padding:15px; border-left: 4px solid #17a2b8; margin-bottom:20px;">
-            <h3 style="margin-top:0;">Block Teacher Availability</h3>
-            <p style="font-size: 14px; color: #555;">Select a teacher and block out specific periods where they cannot be assigned.</p>
-            <div class="combo-row">
-                <select id="us_teacher" style="flex: 2;"><option value="">-- Select Teacher --</option></select>
-                <select id="us_day" style="flex: 1;"></select>
-                <select id="us_period" style="flex: 1.5;"></select>
-                <button type="button" id="btnAddRule" style="background-color: #17a2b8; padding: 8px 15px;">Add Rule</button>
+        <form id="uploadForm">
+            <div class="form-group">
+                <label for="working_days">Working Days per Week:</label>
+                <input type="number" id="working_days" name="working_days" value="5" min="1" max="7" required>
             </div>
-            <ul id="rulesList" style="list-style-type: none; padding: 0;"></ul>
-            <input type="hidden" name="unsuitable_slots" id="unsuitable_slots" value="[]">
+
+            <div class="form-group">
+                <label for="periods_per_day">Periods per Day <span style="font-weight: normal; color: #777;">(Include breaks as separate periods)</span>:</label>
+                <input type="number" id="periods_per_day" name="periods_per_day" value="7" min="1" required>
+            </div>
+
+            <div class="form-group">
+                <label for="partial_tt">Partially Filled Timetable (Excel/CSV):</label>
+                <input type="file" id="partial_tt" name="partial_tt" accept=".xlsx, .xls, .csv" required>
+            </div>
+
+            <div class="form-group">
+                <label for="course_teacher">Course-Teacher Mapping (Excel/CSV):</label>
+                <input type="file" id="course_teacher" name="course_teacher" accept=".xlsx, .xls, .csv" required>
+            </div>
+
+            <div id="unsuitable_ui" style="display:none; background:#f4f7f6; padding:20px; border-left: 4px solid #17a2b8; margin-bottom:20px; border-radius: 4px;">
+                <h3 style="margin-top:0; color: #17a2b8;">Block Teacher Availability</h3>
+                <p style="font-size: 14px; color: #555;">Select a teacher and block out specific periods where they cannot be assigned.</p>
+                <div class="combo-row">
+                    <select id="us_teacher" style="flex: 2;"><option value="">-- Select Teacher --</option></select>
+                    <select id="us_day" style="flex: 1;"></select>
+                    <select id="us_period" style="flex: 1.5;"></select>
+                    <button type="button" id="btnAddRule">Add Rule</button>
+                </div>
+                <ul id="rulesList" style="list-style-type: none; padding: 0;"></ul>
+                <input type="hidden" name="unsuitable_slots" id="unsuitable_slots" value="[]">
+            </div>
+
+            <button type="submit">Generate Timetable</button>
+        </form>
+
+        <div id="result-message"></div>
+
+        <div id="download-section" style="display: none; text-align: center;">
+            <a href="/download/class_timetable" class="download-btn">⬇️ Download Class Matrices</a>
+            <a href="/download/teacher_timetable" class="download-btn">⬇️ Download Teacher Workloads</a>
         </div>
-
-        <button type="submit">Generate Timetable</button>
-    </form>
-
-    <div id="result-message"></div>
-
-    <div id="download-section" style="display: none;">
-        <a href="/download/class_timetable" class="download-btn">Download Class Matrices</a>
-        <a href="/download/teacher_timetable" class="download-btn">Download Teacher Workloads</a>
     </div>
 
     <script>
         let rules = [];
 
-        // Auto-fetch metadata when files change
         const inputsToWatch = ['course_teacher', 'partial_tt', 'working_days', 'periods_per_day'];
         inputsToWatch.forEach(id => {
             document.getElementById(id).addEventListener('change', fetchMetadata);
@@ -77,7 +90,7 @@
 
         async function fetchMetadata() {
             const ctFile = document.getElementById('course_teacher').files[0];
-            if (!ctFile) return; // Wait until they upload the Course Teacher file
+            if (!ctFile) return; 
             
             const formData = new FormData(document.getElementById('uploadForm'));
             try {
@@ -95,7 +108,6 @@
             const dSel = document.getElementById('us_day');
             const pSel = document.getElementById('us_period');
             
-            // Keep current selection if possible, otherwise clear
             tSel.innerHTML = '<option value="">-- Select Teacher --</option>';
             data.teachers.forEach(t => tSel.innerHTML += `<option value="${t}">${t}</option>`);
             
@@ -106,7 +118,6 @@
             data.period_labels.forEach((p, i) => pSel.innerHTML += `<option value="${i}">${p}</option>`);
         }
 
-        // Add Rule logic
         document.getElementById('btnAddRule').addEventListener('click', function() {
             const tSel = document.getElementById('us_teacher');
             const dSel = document.getElementById('us_day');
@@ -132,7 +143,8 @@
             rules.forEach((r, idx) => {
                 const li = document.createElement('li');
                 li.style.marginBottom = '8px';
-                li.innerHTML = `❌ ${r.label} <button type="button" onclick="removeRule(${idx})" style="margin-left:15px; padding:3px 8px; background:#dc3545; border:none; color:white; cursor:pointer; border-radius:3px; font-size:12px;">Remove</button>`;
+                li.style.fontSize = '14px';
+                li.innerHTML = `❌ ${r.label} <button type="button" onclick="removeRule(${idx})" style="margin-left:15px; padding:4px 8px; background:#dc3545; border:none; color:white; cursor:pointer; border-radius:3px; font-size:12px; font-weight:bold;">Remove</button>`;
                 ul.appendChild(li);
             });
         }
@@ -142,7 +154,6 @@
             updateRulesUI();
         };
 
-        // Main Form Submission
         document.getElementById('uploadForm').onsubmit = async function(e) {
             e.preventDefault();
             const formData = new FormData(this);
@@ -157,8 +168,8 @@
                 downloadSection.parentNode.insertBefore(warningDiv, downloadSection);
             }
             
-            resultDiv.innerText = "Generating... Please wait.";
-            resultDiv.style.color = "black";
+            resultDiv.innerText = "Generating timetable... Please wait.";
+            resultDiv.style.color = "#0056b3";
             downloadSection.style.display = 'none';
             warningDiv.style.display = 'none';
 
@@ -167,24 +178,24 @@
                 const data = await response.json();
                 
                 if (response.ok) {
-                    resultDiv.innerText = data.message;
+                    resultDiv.innerText = "✅ " + data.message;
                     resultDiv.style.color = "green";
                     downloadSection.style.display = 'block';
                     
                     if (data.warnings && data.warnings.length > 0) {
-                        let html = "<h4 style='margin-top:0;'>⚠️ Scheduling Constraints Bypassed</h4><p style='font-size: 14px;'>To ensure all required classes were scheduled, the following compromises were made:</p><ul style='font-size: 14px;'>";
-                        data.warnings.forEach(w => { html += `<li>${w}</li>`; });
+                        let html = "<h4 style='margin-top:0;'>⚠️ Generation Alerts & Warnings</h4><ul style='font-size: 15px; line-height: 1.5;'>";
+                        data.warnings.forEach(w => { html += `<li style="margin-bottom: 8px;">${w}</li>`; });
                         html += "</ul>";
                         warningDiv.innerHTML = html;
                         warningDiv.style.display = 'block';
                     }
                 } else {
-                    resultDiv.innerText = "Error: " + data.error;
-                    resultDiv.style.color = "red";
+                    resultDiv.innerText = "❌ Error: " + data.error;
+                    resultDiv.style.color = "#dc3545";
                 }
             } catch (error) {
-                resultDiv.innerText = "A network error occurred.";
-                resultDiv.style.color = "red";
+                resultDiv.innerText = "❌ A network error occurred.";
+                resultDiv.style.color = "#dc3545";
             }
         };
     </script>

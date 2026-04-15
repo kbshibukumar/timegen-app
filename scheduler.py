@@ -76,7 +76,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     period_labels = [f"P{i+1}" for i in range(periods_per_day)]
     day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
-    # Lock unsuitable slots for specified teachers right away
     if unsuitable_slots:
         for us in unsuitable_slots:
             t_name = sanitize(us.get('teacher'))
@@ -95,7 +94,6 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
             is_adj = True
         return is_adj
 
-    # --- PRE-PROCESS PARTIALLY FILLED TIMETABLE ---
     if partial_tt_path.endswith('.xlsx'): df_partial = pd.read_excel(partial_tt_path, header=None)
     else: df_partial = pd.read_csv(partial_tt_path, header=None)
     
@@ -126,26 +124,21 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                         for t in CTMap[key]['teachers']: 
                             existing_status = TS.get(t, {}).get(slot)
                             
-                            # Validation 1: Hard Crash if mapped to a user-defined Unsuitable Slot
                             if existing_status == 'BUSY':
                                 d_name = day_names[slot // periods_per_day]
                                 p_label = period_labels[slot % periods_per_day]
                                 raise ValueError(f"Conflict Error: Teacher '{t}' is pre-assigned to class '{class_id}' for '{val}' on {d_name} ({p_label}) in your Partially Filled file, but you marked this slot as Unsuitable for them!")
                             
-                            # Validation 2: Strong Warning + Comma Concatenation if double-booked
                             elif existing_status and class_id not in [x.strip() for x in existing_status.split(',')]:
                                 d_name = day_names[slot // periods_per_day]
                                 p_label = period_labels[slot % periods_per_day]
                                 warnings.append(f"🚨 <b>STRONG WARNING:</b> Double Booking in Partial File! Teacher <b>{t}</b> is manually assigned to both class <b>{existing_status}</b> and class <b>{class_id}</b> during <b>{d_name} ({p_label})</b>. Please verify if this is intentional (e.g., a combined class session).")
-                                
-                                # CRITICAL FIX: Append the new class with a comma instead of overwriting
                                 TS[t][slot] = f"{existing_status}, {class_id}"
                             
                             else:
                                 TS[t][slot] = class_id 
                 slot += 1
 
-    # --- MAXIMALLY DISTANT SLOT-FILLING WITH TWO-PASS SOFT CONSTRAINTS ---
     for (class_id, course), remaining_hrs in CHMap.items():
         if remaining_hrs <= 0: continue 
             
@@ -202,7 +195,8 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                     t_str = best_teacher if best_teacher != "ALL" else ", ".join(assigned_teachers)
                     warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{d_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
             else:
-                warnings.append(f"🚨 <b>Failed to allocate period:</b> Could not find a valid slot for <b>{class_id} ({course})</b>. It was supposed to get {remaining_hrs} remaining periods, but constraints were too tight. Please adjust manually.")
+                # CRITICAL FIX: Formatted in bold bright red using an inline HTML span
+                warnings.append(f"<span style='color: #dc3545; font-size: 16px;'>🚨 <b>CRITICAL FAILURE - FAILED TO ALLOCATE PERIOD:</b> Could not find a valid slot for <b>{class_id} ({course})</b>. It was supposed to get {remaining_hrs} remaining periods, but constraints were too tight. Please adjust manually.</span>")
 
     return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings, 'period_labels': period_labels}
 
