@@ -121,5 +121,9 @@ def download_sample_partial():
     except FileNotFoundError:
         return "Template file not found on the server. Please ensure 'Sample_Partially_Filled.xlsx' is in the static folder.", 404
 
+@app.route('/help')
+def help_page():
+    return render_template('help.html')
+	
 if __name__ == '__main__':
     app.run(debug=True)

@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TimeGen User Manual</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 900px; margin: 0 auto; padding: 40px 20px; background-color: #f4f7f9; }
+        .doc-card { background: white; padding: 50px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        h1 { color: #0056b3; border-bottom: 2px solid #0056b3; padding-bottom: 10px; }
+        h2 { color: #0056b3; margin-top: 30px; border-left: 5px solid #0056b3; padding-left: 15px; }
+        h3 { color: #444; margin-top: 20px; }
+        code { background: #eee; padding: 2px 5px; border-radius: 4px; font-family: 'Courier New', Courier, monospace; font-weight: bold; }
+        .example-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px; }
+        .example-table th, .example-table td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        .example-table th { background-color: #f8f9fa; color: #0056b3; }
+        .warning-box { padding: 15px; border-radius: 6px; margin: 20px 0; border-left: 6px solid; }
+        .soft { background: #fff3cd; border-color: #ffeeba; color: #856404; }
+        .hard { background: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .btn-print { float: right; background: #6c757d; color: white; padding: 8px 15px; text-decoration: none; border-radius: 4px; font-size: 14px; }
+        @media print { .btn-print { display: none; } body { background: white; padding: 0; } .doc-card { box-shadow: none; padding: 20px; } }
+    </style>
+</head>
+<body>
+
+    <div class="doc-card">
+        <a href="#" onclick="window.print()" class="btn-print">🖨️ Print to PDF</a>
+        <h1>TimeGen: User Manual</h1>
+        <p><i>Automated Academic Timetable Generation System</i></p>
+
+        <h2>1. Data Integrity & Naming Rules</h2>
+        <p>The system is strict about spelling but forgiving with formatting. Consistency across both files is mandatory.</p>
+        <ul>
+            <li><b>Case & Spaces:</b> <code>Discrete Maths</code> and <code>discrete maths</code> are treated as the same.</li>
+            <li><b>Literal Spelling:</b> <code>Discrete Maths</code> and <code>DiscreteMaths</code> are treated as <b>different</b> courses.</li>
+            <li><b>Class Specificity:</b> "Maths" in class <b>S1</b> is scheduled independently of "Maths" in class <b>S3</b>.</li>
+            <li><b>Faculty Names:</b> <code>Prof. Smith</code> and <code>Prof Smith</code> (missing period) are treated as two different people.</li>
+        </ul>
+
+        <h2>2. Course-Teacher Mapping</h2>
+        <p>This file defines your department's workload. <b>Only include faculty from your department</b> here.</p>
+        
+        <h3>Course Types (L vs O)</h3>
+        <ul>
+            <li><b>Type L (Lecture):</b> Standard distribution. Workload is split among listed teachers.</li>
+            <li><b>Type O (Simultaneous):</b> All listed teachers are locked into the same period at once.</li>
+        </ul>
+
+        <h4>Example: Parallel Physics and C Labs</h4>
+        <p>To run two different labs simultaneously for the same class, treat them as one entry:</p>
+        <table class="example-table">
+            <tr><th>Class</th><th>Course</th><th>Type</th><th>Hours</th><th>Teacher</th></tr>
+            <tr><td>S1A</td><td>Physics / C Lab</td><td>O</td><td>3</td><td>Prof. A, Prof. B, Prof. C</td></tr>
+        </table>
+
+        <h4>Example: Lecture + Tutorial Split</h4>
+        <p>If a course has 2 lecture hours (1 teacher) and 1 tutorial hour (multiple teachers):</p>
+        <table class="example-table">
+            <tr><th>Class</th><th>Course</th><th>Type</th><th>Hours</th><th>Teacher</th></tr>
+            <tr><td>S1A</td><td>Maths</td><td>L</td><td>2</td><td>Prof. Smith</td></tr>
+            <tr><td>S1A</td><td>Maths (T)</td><td>O</td><td>1</td><td>Prof. Smith, Prof. Davis</td></tr>
+        </table>
+
+        <h2>3. Partially Filled Timetable</h2>
+        <p>Use this to manually "lock" periods before the algorithm starts.</p>
+        <ul>
+            <li><b>Breaks:</b> Use <code>BREAK</code> or <code>LUNCH</code> to block slots for all classes.</li>
+            <li><b>Internal Subjects:</b> Enter the name exactly as it appears in the Mapping file to allocate your faculty.</li>
+            <li><b>External Subjects:</b> If a class is taken by another department (e.g., <b>Physics</b>), enter it here. Since there is no matching teacher in your mapping file, the system will block the students' time without affecting your faculty workload.</li>
+            <li><b>Remedial/Free:</b> Label slots as <code>REMEDIAL</code> to reserve time without assigning a teacher.</li>
+        </ul>
+
+        <h2>4. Advanced Features</h2>
+        <h3>Unsuitable Slots</h3>
+        <p>Used to block faculty who are busy with administrative duties or <b>taking classes in other departments</b>. Access this via the "Block Teacher Availability" menu after uploading your mapping file.</p>
+
+        <h3>Intentional Double-Booking</h3>
+        <p>For combined seminars or shared electives where one teacher handles two classes at once, place the same subject in the same slot for both classes in the Partial file. The system will merge these in the output (e.g., "S1A, S1B").</p>
+
+        <h2>5. Alerts & Warnings</h2>
+        <div class="warning-box soft">
+            <b>[SOFT WARNING] Teacher Continuity Forced:</b> System assigned back-to-back periods to fulfill hours.
+        </div>
+        <div class="warning-box soft">
+            <b>[STRONG WARNING] Double Booking:</b> Detected a manual double-assignment in your Partial file.
+        </div>
+        <div class="warning-box hard">
+            <b>[HARD ERROR] Failed to Allocate Period:</b> Constraints were mathematically impossible. You must manually assign this period in the exported Excel file.
+        </div>
+    </div>
+
+</body>
+</html>
