@@ -74,6 +74,7 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
     warnings = []
     
     period_labels = [f"P{i+1}" for i in range(periods_per_day)]
+    day_names = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     # Lock unsuitable slots for specified teachers right away
     if unsuitable_slots:
@@ -95,37 +96,43 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
         return is_adj
 
     # --- PRE-PROCESS PARTIALLY FILLED TIMETABLE ---
-    try:
-        if partial_tt_path.endswith('.xlsx'): df_partial = pd.read_excel(partial_tt_path, header=None)
-        else: df_partial = pd.read_csv(partial_tt_path, header=None)
-        
-        if len(df_partial) > 1:
-            row_2 = [sanitize(str(x)) if pd.notna(x) else "" for x in df_partial.iloc[1].values]
-            extracted_labels = [x for x in row_2[1:] if x]
-            if len(extracted_labels) > 0:
-                for i in range(min(len(extracted_labels), periods_per_day)):
-                    period_labels[i] = extracted_labels[i]
+    # We removed the blanket try-except here so validation errors can successfully crash the process and alert the user
+    if partial_tt_path.endswith('.xlsx'): df_partial = pd.read_excel(partial_tt_path, header=None)
+    else: df_partial = pd.read_csv(partial_tt_path, header=None)
+    
+    if len(df_partial) > 1:
+        row_2 = [sanitize(str(x)) if pd.notna(x) else "" for x in df_partial.iloc[1].values]
+        extracted_labels = [x for x in row_2[1:] if x]
+        if len(extracted_labels) > 0:
+            for i in range(min(len(extracted_labels), periods_per_day)):
+                period_labels[i] = extracted_labels[i]
 
-        for _, row in df_partial.iterrows():
-            row_vals = [sanitize(str(x)) if pd.notna(x) else "" for x in row.values]
-            class_id, start_col = None, 0
-            for i, val in enumerate(row_vals):
-                if val in classes:
-                    class_id = val; start_col = i + 1; break
-                    
-            if class_id:
-                slot = 0
-                for i in range(start_col, len(row_vals)):
-                    if slot >= max_slots: break
-                    val = row_vals[i]
-                    if val:
-                        TT[class_id][slot] = val
-                        key = (class_id, val)
-                        if key in CHMap:
-                            CHMap[key] -= 1  
-                            for t in CTMap[key]['teachers']: TS[t][slot] = class_id 
-                    slot += 1
-    except Exception as e: pass
+    for _, row in df_partial.iterrows():
+        row_vals = [sanitize(str(x)) if pd.notna(x) else "" for x in row.values]
+        class_id, start_col = None, 0
+        for i, val in enumerate(row_vals):
+            if val in classes:
+                class_id = val; start_col = i + 1; break
+                
+        if class_id:
+            slot = 0
+            for i in range(start_col, len(row_vals)):
+                if slot >= max_slots: break
+                val = row_vals[i]
+                if val:
+                    TT[class_id][slot] = val
+                    key = (class_id, val)
+                    if key in CHMap:
+                        CHMap[key] -= 1  
+                        for t in CTMap[key]['teachers']: 
+                            # NEW: Strict validation check
+                            if TS.get(t, {}).get(slot) == 'BUSY':
+                                d_name = day_names[slot // periods_per_day]
+                                p_label = period_labels[slot % periods_per_day]
+                                raise ValueError(f"Conflict Error: Teacher '{t}' is pre-assigned to class '{class_id}' for '{val}' on {d_name} ({p_label}) in your Partially Filled file, but you marked this slot as Unsuitable for them!")
+                            
+                            TS[t][slot] = class_id 
+                slot += 1
 
     # --- MAXIMALLY DISTANT SLOT-FILLING WITH TWO-PASS SOFT CONSTRAINTS ---
     for (class_id, course), remaining_hrs in CHMap.items():
@@ -179,13 +186,11 @@ def generate_timetable(partial_tt_path, course_teacher_path, periods_per_day, wo
                     TS[best_teacher][best_slot] = class_id
                 
                 if not is_perfect_match:
-                    day_names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
-                    day_name = day_names[best_slot // periods_per_day]
+                    d_name = day_names[best_slot // periods_per_day]
                     p_label = period_labels[best_slot % periods_per_day]
                     t_str = best_teacher if best_teacher != "ALL" else ", ".join(assigned_teachers)
-                    warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{day_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
+                    warnings.append(f"Teacher continuity forced: <b>{t_str}</b> was assigned consecutive periods on <b>{d_name} ({p_label})</b> for class <b>{class_id} ({course})</b> due to schedule density.")
             else:
-                # NEW: Catch the failure and alert the user!
                 warnings.append(f"🚨 <b>Failed to allocate period:</b> Could not find a valid slot for <b>{class_id} ({course})</b>. It was supposed to get {remaining_hrs} remaining periods, but constraints were too tight. Please adjust manually.")
 
     return TT, TS, {'classes': classes, 'teachers': teachers, 'periods': periods_per_day, 'working_days': working_days, 'warnings': warnings, 'period_labels': period_labels}
